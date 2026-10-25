@@ -9,3 +9,4 @@ parser-tests/
 *.jks
 *.keystore
 release-files/
+.signing/

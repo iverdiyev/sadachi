@@ -7,6 +7,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      SADACHI_KEYSTORE_PATH: ${{ github.workspace }}/.signing/debug.keystore
     permissions:
       contents: write
     steps:
@@ -27,15 +29,21 @@ jobs:
         run: |
           test -n "$SIGNING_KEY"
           umask 077
-          mkdir -p "$HOME/.android"
-          printf '%s' "$SIGNING_KEY" | base64 --decode > "$HOME/.android/debug.keystore"
+          mkdir -p "$(dirname "$SADACHI_KEYSTORE_PATH")"
+          printf '%s' "$SIGNING_KEY" | base64 --decode > "$SADACHI_KEYSTORE_PATH"
       - name: Проверить парсер
         run: |
           mkdir -p parser-tests
           javac -encoding UTF-8 -d parser-tests app/src/main/java/ru/svoizadachi/app/TaskDateParser.java tests/ParserTest.java
           java -cp parser-tests ParserTest
       - name: Тесты и сборка APK
-        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --no-build-cache
+      - name: Проверить постоянную подпись APK
+        run: |
+          keytool -exportcert -keystore "$SADACHI_KEYSTORE_PATH" -storepass android -alias androiddebugkey -file "$RUNNER_TEMP/sadachi-cert.der"
+          expected=$(sha256sum "$RUNNER_TEMP/sadachi-cert.der" | cut -d ' ' -f 1)
+          actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test "$expected" = "$actual"
       - name: Отчёты тестов
         if: always()
         uses: actions/upload-artifact@v4

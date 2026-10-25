@@ -10,13 +10,27 @@ android {
         applicationId 'ru.svoizadachi.app'
         minSdk 26
         targetSdk 35
-        versionCode 5
-        versionName '0.4.0'
+        versionCode 6
+        versionName '0.4.1'
     }
 
     buildTypes {
         release {
             minifyEnabled false
+        }
+    }
+
+    // CI uses a persistent repository secret, never an implicitly generated key.
+    signingConfigs {
+        debug {
+            def signingPath = System.getenv('SADACHI_KEYSTORE_PATH')
+            if (signingPath) {
+                storeFile file(signingPath)
+                storeType 'PKCS12'
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
 
