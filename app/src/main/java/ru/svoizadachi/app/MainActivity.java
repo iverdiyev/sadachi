@@ -33,12 +33,14 @@ import java.util.*;
 
 /** Native, offline UI. No WebView, network or heavyweight animation framework. */
 public final class MainActivity extends Activity {
-    private static final int BACKGROUND=Color.rgb(246,247,252);
-    private static final int PURPLE=Color.rgb(73,112,223);
-    private static final int TEXT=Color.rgb(33,35,57);
-    private static final int SUBTLE=Color.rgb(105,110,133);
+    private int BACKGROUND=Color.rgb(246,247,252);
+    private int PURPLE=Color.rgb(73,112,223);
+    private int TEXT=Color.rgb(33,35,57);
+    private int SUBTLE=Color.rgb(105,110,133);
+    private int CARD=Color.WHITE;
+    private boolean dark;
     private static final int PALE=Color.rgb(237,233,255);
-    private static final int LINE=Color.rgb(232,232,243);
+    private int LINE=Color.rgb(232,232,243);
     private static final int GREEN=Color.rgb(37,126,107);
     private static final Locale RU=new Locale("ru");
     private static final String[] FILTER_NAMES={"Все","Сегодня","Потом","Готово"};
@@ -77,15 +79,18 @@ public final class MainActivity extends Activity {
     };
 
     @Override public void onCreate(Bundle state){
+        dark=ThemeSettings.dark(this);setTheme(dark?R.style.AppTheme_Dark:R.style.AppTheme);
         super.onCreate(state);
+        if(dark){BACKGROUND=0xFF121722;TEXT=0xFFF0F2FA;SUBTLE=0xFFB2BACF;CARD=0xFF1E2635;LINE=0xFF344055;PURPLE=0xFF91ACFF;}
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(BACKGROUND);
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         else getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 |View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        getWindow().getDecorView().setSystemUiVisibility(getWindow().getDecorView().getSystemUiVisibility()
-                |View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        int flags=getWindow().getDecorView().getSystemUiVisibility();
+        int light=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        getWindow().getDecorView().setSystemUiVisibility(dark?flags&~light:flags|light);
         store=new TaskStore(this);
         ReminderScheduler.createChannel(this);
         if(state!=null){
@@ -95,6 +100,7 @@ public final class MainActivity extends Activity {
         buildInterface();
         if(state!=null){entry.setText(state.getString("draft",""));entry.setSelection(entry.length());}
         openWidgetIntent(getIntent());
+        AppUpdates.checkOnEntry(this);
     }
     @Override protected void onResume(){
         super.onResume();
@@ -193,11 +199,11 @@ public final class MainActivity extends Activity {
         TextView title=label("Входящие",30,TEXT,true);
         heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         TextView settings=label("⋯",26,PURPLE,true);settings.setGravity(Gravity.CENTER);
-        settings.setContentDescription("Настройки напоминаний");touchBackground(settings,Color.WHITE,18);
-        heading.addView(settings,lp(48,48));settings.setOnClickListener(v->showReminderSettings());
+        settings.setContentDescription("Настройки приложения");touchBackground(settings,CARD,18);
+        heading.addView(settings,lp(48,48));settings.setOnClickListener(v->showAppSettings());
         page.addView(heading,lp(-1,-2));
         folderLabel=label("Все заметки  ▾",14,PURPLE,true);folderLabel.setPadding(dp(10),dp(12),dp(10),dp(12));
-        folderLabel.setMinHeight(dp(48));touchBackground(folderLabel,Color.WHITE,14);
+        folderLabel.setMinHeight(dp(48));touchBackground(folderLabel,CARD,14);
         folderLabel.setOnClickListener(v->showFolders());folderLabel.setOnLongClickListener(v->{manageFolders();return true;});
         LinearLayout.LayoutParams foldersLp=lp(-1,-2);foldersLp.topMargin=dp(10);page.addView(folderLabel,foldersLp);gap(page,16);
 
@@ -214,14 +220,14 @@ public final class MainActivity extends Activity {
         hero.addView(progress,lp(-1,5));page.addView(hero,lp(-1,-2));gap(page,18);
 
         undoBar=new LinearLayout(this);undoBar.setGravity(Gravity.CENTER_VERTICAL);undoBar.setPadding(dp(16),dp(4),dp(8),dp(4));
-        undoBar.setBackground(bg(TEXT,16));undoBar.setVisibility(View.GONE);
+        undoBar.setBackground(bg(dark?CARD:TEXT,16));undoBar.setVisibility(View.GONE);
         undoMessage=label("Задача выполнена",13,Color.WHITE,false);
         undoBar.addView(undoMessage,new LinearLayout.LayoutParams(0,-2,1));
-        TextView undo=label("Отменить",13,0xFFB8CEFF,true);undo.setGravity(Gravity.CENTER);touchBackground(undo,TEXT,12);
+        TextView undo=label("Отменить",13,0xFFB8CEFF,true);undo.setGravity(Gravity.CENTER);touchBackground(undo,dark?CARD:TEXT,12);
         undoBar.addView(undo,lp(96,48));undo.setOnClickListener(v->{if(undoAction!=null)undoAction.run();handler.removeCallbacks(hideUndo);hideUndo.run();});
         LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
         LinearLayout composer=column();composer.setPadding(dp(16),dp(10),dp(16),dp(12));
-        composer.setBackground(border(Color.WHITE,22));
+        composer.setBackground(border(CARD,22));
         hints=new TextSwitcher(this);hints.setFactory(()->label("",12,SUBTLE,false));hints.setCurrentText(HINTS[0]);
         android.view.animation.AnimationSet hintIn=new android.view.animation.AnimationSet(true);
         hintIn.addAnimation(new android.view.animation.AlphaAnimation(0,1));hintIn.addAnimation(new android.view.animation.TranslateAnimation(0,0,dp(5),0));hintIn.setDuration(220);
@@ -254,19 +260,20 @@ public final class MainActivity extends Activity {
         for(int i=0;i<names.length;i++){
             final String phrase=phrases[i];
             TextView shortcut=label(names[i],12,PURPLE,true);shortcut.setGravity(Gravity.CENTER);
-            shortcut.setPadding(dp(12),0,dp(12),0);touchBackground(shortcut,Color.WHITE,12);
+            shortcut.setPadding(dp(12),0,dp(12),0);touchBackground(shortcut,CARD,12);
             LinearLayout.LayoutParams p=lp(-2,48);p.rightMargin=dp(4);shortcuts.addView(shortcut,p);
             shortcut.setOnClickListener(v->{
                 String raw=entry.getText().toString().trim();
                 TaskDateParser.Result parsed=TaskDateParser.parse(raw);
                 String name=parsed.dueAt==null?raw:parsed.title;
                 if(name.equals("Напоминание"))name="";
+                draftDue=null;draftHasTime=false;dateChip.setText("Выбрать дату");
                 entry.setText((name+" "+phrase).trim());entry.setSelection(entry.length());
                 updatePreview();
             });
         }
         suggestions.addView(shortcuts);composer.addView(suggestions,lp(-1,-2));gap(composer,4);
-        TextView add=label("＋  Добавить задачу",15,Color.WHITE,true);add.setGravity(Gravity.CENTER);
+        TextView add=label("＋  Добавить задачу",15,dark?BACKGROUND:Color.WHITE,true);add.setGravity(Gravity.CENTER);
         add.setPadding(dp(14),dp(16),dp(14),dp(16));add.setMinHeight(dp(52));touchBackground(add,PURPLE,16);
         composer.addView(add,lp(-1,-2));add.setOnClickListener(v->createTask());
         entry.setOnEditorActionListener((v,action,event)->{
@@ -284,9 +291,10 @@ public final class MainActivity extends Activity {
         root.addView(composer,composerLp);
 
         permissionCard=column();permissionCard.setPadding(dp(16),dp(14),dp(16),dp(14));
-        touchBackground(permissionCard,Color.rgb(255,245,225),18);
-        permissionCard.addView(label("Проверь напоминания",14,Color.rgb(123,85,25),true),lp(-1,-2));
-        gap(permissionCard,6);permissionText=label("",12,Color.rgb(123,85,25),false);
+        int warningText=dark?0xFFFFD89C:Color.rgb(123,85,25);
+        touchBackground(permissionCard,dark?0xFF3B3020:Color.rgb(255,245,225),18);
+        permissionCard.addView(label("Проверь напоминания",14,warningText,true),lp(-1,-2));
+        gap(permissionCard,6);permissionText=label("",12,warningText,false);
         permissionCard.addView(permissionText,lp(-1,-2));permissionCard.setOnClickListener(v->showReminderSettings());
         page.addView(permissionCard,lp(-1,-2));
 
@@ -396,12 +404,26 @@ public final class MainActivity extends Activity {
                     }).show();
         }).setNegativeButton("Закрыть",null).show();
     }
+    private void showAppSettings(){
+        new AlertDialog.Builder(this).setTitle("Настройки")
+                .setItems(new String[]{"Тема приложения","Обновления","Напоминания","Как добавить виджет"},(d,index)->{
+                    if(index==0)new AlertDialog.Builder(this).setTitle("Тема приложения")
+                            .setSingleChoiceItems(new String[]{"Как в системе","Светлая","Тёмная"},ThemeSettings.mode(this),(dialog,mode)->{
+                                ThemeSettings.setMode(this,mode);TaskWidgetProvider.updateAll(this);dialog.dismiss();recreate();
+                            }).setNegativeButton("Отмена",null).show();
+                    else if(index==1)AppUpdates.show(this);
+                    else if(index==2)showReminderSettings();
+                    else new AlertDialog.Builder(this).setTitle("Виджеты")
+                            .setMessage("Зажми свободное место на рабочем столе → Виджеты → Свои задачи. Выбери «Список» или «Сегодня». Размер можно изменить долгим нажатием на виджет.")
+                            .setPositiveButton("Понятно",null).show();
+                }).show();
+    }
     private void renderChips(){
         chipRow.removeAllViews();
         for(int i=0;i<FILTER_NAMES.length;i++){
-            final int index=i;TextView chip=label(FILTER_NAMES[i],13,i==filter?Color.WHITE:SUBTLE,true);
+            final int index=i;TextView chip=label(FILTER_NAMES[i],13,i==filter?(dark?BACKGROUND:Color.WHITE):SUBTLE,true);
             chip.setGravity(Gravity.CENTER);chip.setPadding(dp(16),dp(13),dp(16),dp(13));chip.setMinHeight(dp(48));
-            touchBackground(chip,i==filter?PURPLE:Color.WHITE,16);
+            touchBackground(chip,i==filter?PURPLE:CARD,16);
             chip.setSelected(i==filter);chip.setContentDescription(FILTER_NAMES[i]+(i==filter?", выбрано":""));
             LinearLayout.LayoutParams p=lp(-2,-2);p.rightMargin=dp(6);chipRow.addView(chip,p);
             chip.setOnClickListener(v->{if(filter!=index){
@@ -445,7 +467,7 @@ public final class MainActivity extends Activity {
             View card=createCard(task);if(animate&&displayed<8)enter(card,displayed*25);displayed++;
         }
         if(displayed==0){
-            LinearLayout empty=column();empty.setPadding(dp(20),dp(30),dp(20),dp(30));empty.setBackground(border(Color.WHITE,24));
+            LinearLayout empty=column();empty.setPadding(dp(20),dp(30),dp(20),dp(30));empty.setBackground(border(CARD,24));
             TextView icon=label(filter==3?"✓":"○",36,PURPLE,false);icon.setGravity(Gravity.CENTER);empty.addView(icon,lp(-1,50));gap(empty,12);
             TextView title=label(filter==3?"Пока без галочек":filter==1?"На сегодня всё спокойно":filter==2?"Будущее свободно":"Чистый лист",18,TEXT,true);
             title.setGravity(Gravity.CENTER);empty.addView(title,lp(-1,-2));gap(empty,8);
@@ -456,7 +478,7 @@ public final class MainActivity extends Activity {
     }
     private View createCard(Task task){
         SwipeTaskLayout row=new SwipeTaskLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(6),dp(10),dp(6),dp(10));row.setBackground(border(Color.WHITE,18));
+        row.setPadding(dp(6),dp(10),dp(6),dp(10));row.setBackground(border(CARD,18));
         LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(10);cards.addView(row,p);
         CheckBox done=new CheckBox(this);done.setButtonTintList(ColorStateList.valueOf(task.done?GREEN:PURPLE));
         done.setContentDescription((task.done?"Вернуть задачу: ":"Завершить задачу: ")+task.title);
@@ -492,7 +514,7 @@ public final class MainActivity extends Activity {
         });
         text.setFocusable(true);text.setContentDescription(task.title+". "+taskDate(task)+". Раскрыть описание и чек-лист");
         TextView more=label("⋮",24,SUBTLE,false);more.setGravity(Gravity.CENTER);
-        more.setContentDescription("Действия с задачей: "+task.title);touchBackground(more,Color.WHITE,14);
+        more.setContentDescription("Действия с задачей: "+task.title);touchBackground(more,CARD,14);
         row.addView(more,lp(48,48));more.setOnClickListener(v->taskOptions(task));
         row.onComplete(()->completeTask(task,!task.done,row,title));
         done.setOnCheckedChangeListener((v,checked)->{done.setEnabled(false);completeTask(task,checked,row,title);});

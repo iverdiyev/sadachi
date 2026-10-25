@@ -6,3 +6,6 @@ app/build/
 local.properties
 parser-tests/
 .DS_Store
+*.jks
+*.keystore
+release-files/

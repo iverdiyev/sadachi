@@ -17,7 +17,7 @@ import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=35)
+@Config(sdk=35,application=OfflineTestApplication.class)
 public class NotesAndWidgetsTest {
     private final Application context=RuntimeEnvironment.getApplication();
     private Task create(String name,Long due){
@@ -76,7 +76,7 @@ public class NotesAndWidgetsTest {
     @Test public void editorCancelLeavesOriginalDescriptionAndChecklist(){
         Task task=create("Заметка",null);task.description="Оригинал";task.items.add(new Task.Item("Пункт",false));new TaskStore(context).upsert(task);
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
-            TaskEditor.show(controller.get(),task,()->{});AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            TaskEditor.show(controller.get(),task,()->{});shadowOf(Looper.getMainLooper()).idle();AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
             find(dialog.getWindow().getDecorView(),EditText.class,"Оригинал").setText("Изменено");
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();
             Task restored=new TaskStore(context).find(task.id);assertEquals("Оригинал",restored.description);assertEquals(1,restored.items.size());
@@ -85,12 +85,12 @@ public class NotesAndWidgetsTest {
     @Test public void editorSavesDescriptionAndChecklist(){
         Task task=create("Заметка",null);
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
-            TaskEditor.show(controller.get(),task,()->{});AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            TaskEditor.show(controller.get(),task,()->{});shadowOf(Looper.getMainLooper()).idle();AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
             View root=dialog.getWindow().getDecorView();
             for(EditText edit:edits(root))if("Подробности, ссылки, мысли…".contentEquals(edit.getHint()))edit.setText("Описание заметки");
             find(root,Button.class,"＋ Добавить пункт").performClick();
             for(EditText edit:edits(root))if("Пункт списка".contentEquals(edit.getHint()))edit.setText("Первый шаг");
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();Task restored=new TaskStore(context).find(task.id);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();Task restored=new TaskStore(context).find(task.id);
             assertEquals("Описание заметки",restored.description);assertEquals("Первый шаг",restored.items.get(0).text);
         }
     }
@@ -99,10 +99,10 @@ public class NotesAndWidgetsTest {
             Long[] result={null};boolean[] timed={false};
             DateTimePicker.show(controller.get(),null,(due,time)->{result[0]=due;timed[0]=time;});
             DatePickerDialog date=(DatePickerDialog)org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
-            date.getDatePicker().updateDate(2027,0,3);date.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            date.getDatePicker().updateDate(2027,0,3);date.getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();
             TimePickerDialog time=(TimePickerDialog)org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
             TimePicker picker=find(time.getWindow().getDecorView(),TimePicker.class,null);picker.setHour(14);picker.setMinute(25);
-            time.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            time.getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();
             assertTrue(timed[0]);assertEquals(Long.valueOf(LocalDate.of(2027,1,3).atTime(14,25).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()),result[0]);
         }
     }
@@ -111,7 +111,7 @@ public class NotesAndWidgetsTest {
             Long[] result={null};boolean[] timed={true};
             DateTimePicker.show(controller.get(),null,(due,time)->{result[0]=due;timed[0]=time;});
             DatePickerDialog date=(DatePickerDialog)org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
-            date.getDatePicker().updateDate(2027,1,4);date.getButton(AlertDialog.BUTTON_NEUTRAL).performClick();
+            date.getDatePicker().updateDate(2027,1,4);date.getButton(AlertDialog.BUTTON_NEUTRAL).performClick();shadowOf(Looper.getMainLooper()).idle();
             assertFalse(timed[0]);assertEquals(Long.valueOf(LocalDate.of(2027,2,4).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()),result[0]);
         }
     }

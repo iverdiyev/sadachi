@@ -40,6 +40,9 @@ public class TaskWidgetProvider extends AppWidgetProvider {
     }
     private static void render(Context c,AppWidgetManager manager,int id,boolean today,Class<?> provider){
         RemoteViews view=new RemoteViews(c.getPackageName(),R.layout.widget_tasks);
+        view.setInt(R.id.widget_root,"setBackgroundResource",ThemeSettings.dark(c)?R.drawable.widget_background_dark:R.drawable.widget_background);
+        view.setTextColor(R.id.widget_title,ThemeSettings.text(c));view.setTextColor(R.id.widget_count,ThemeSettings.subtle(c));
+        view.setTextColor(R.id.widget_empty,ThemeSettings.subtle(c));
         List<Task> tasks=visibleTasks(new TaskStore(c).all(),today);
         view.setTextViewText(R.id.widget_title,today?"Сегодня":"Свои задачи");
         view.setTextViewText(R.id.widget_count,tasks.isEmpty()?"Нет активных задач":tasks.size()+" задач");
@@ -51,6 +54,7 @@ public class TaskWidgetProvider extends AppWidgetProvider {
         int limit=Math.max(1,Math.min(5,(height-100)/64));
         for(int i=0;i<Math.min(limit,tasks.size());i++){
             Task task=tasks.get(i);RemoteViews row=new RemoteViews(c.getPackageName(),R.layout.widget_task_row);
+            row.setTextColor(R.id.widget_task_title,ThemeSettings.text(c));row.setTextColor(R.id.widget_task_detail,ThemeSettings.subtle(c));
             row.setTextViewText(R.id.widget_task_title,task.title);
             String detail=task.folder.isEmpty()?"Без папки":task.folder;
             if(task.dueAt!=null)detail=Instant.ofEpochMilli(task.dueAt).atZone(ZoneId.systemDefault())

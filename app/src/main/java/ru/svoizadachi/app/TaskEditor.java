@@ -20,12 +20,12 @@ public final class TaskEditor {
     private int dp(int value){return Math.round(value*activity.getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout view=new LinearLayout(activity);view.setOrientation(LinearLayout.VERTICAL);return view;}
     private void heading(LinearLayout parent,String text){
-        TextView view=new TextView(activity);view.setText(text);view.setTextSize(13);view.setTextColor(0xFF696E85);
+        TextView view=new TextView(activity);view.setText(text);view.setTextSize(13);view.setTextColor(ThemeSettings.subtle(activity));
         view.setPadding(0,dp(16),0,dp(6));parent.addView(view);
     }
     private Button button(String text){Button button=new Button(activity);button.setText(text);button.setAllCaps(false);button.setMinHeight(dp(48));return button;}
     private EditText input(String hint,String value){
-        EditText edit=new EditText(activity);edit.setText(value);edit.setHint(hint);edit.setTextSize(16);edit.setTextColor(0xFF212339);
+        EditText edit=new EditText(activity);edit.setText(value);edit.setHint(hint);edit.setTextSize(16);edit.setTextColor(ThemeSettings.text(activity));
         edit.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         edit.setMaxLines(8);return edit;
     }

@@ -17,7 +17,7 @@ import static org.junit.Assert.*;
 
 /** Layout/interaction regression tests. Physical OxygenOS delivery is a separate device check. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=35)
+@Config(sdk=35,application=OfflineTestApplication.class)
 public class MainActivityTest {
     private ViewGroup content(MainActivity activity){
         return (ViewGroup)((ViewGroup)activity.findViewById(android.R.id.content)).getChildAt(0);
