@@ -25,8 +25,20 @@ public class ParserTest {
         has("Вынести мусор каждую неделю в 19:00","Вынести мусор","2026-10-24T19:00",true,2,now);
         has("Оплатить связь в 13:00","Оплатить связь","2026-10-25T13:00",true,0,now);
         has("Просто задача","Просто задача",null,false,0,now);
+        has("Проверить чай через 2 минуты","Проверить чай","2026-10-24T18:32",true,0,now);
+        has("через 2 минуты","Напоминание","2026-10-24T18:32",true,0,now);
+        has("Перерыв через час","Перерыв","2026-10-24T19:30",true,0,now);
+        has("Позвонить через два часа","Позвонить","2026-10-24T20:30",true,0,now);
+        has("Чай через одну минуту","Чай","2026-10-24T18:31",true,0,now);
+        has("Таймер через 30 секунд","Таймер","2026-10-24T18:30:30",true,0,now);
+        has("Вода через 5 мин","Вода","2026-10-24T18:35",true,0,now);
+        ZonedDateTime late=now.withHour(23).withMinute(59).withSecond(20);
+        TaskDateParser.Result midnight=TaskDateParser.parse("Сон через 2 минуты",late);
+        check(midnight.dueAt==late.plusMinutes(2).toInstant().toEpochMilli(),"relative duration across midnight preserves seconds");
+        check(TaskDateParser.parse("Таймер через 0 минут",now).dueAt==null,"zero duration is not scheduled");
         // Simulate typing each character: the original app crashed on the first keystroke.
         String[] typed = {
+            "Чай через 2 минуты", "Перерыв через час", "Таймер через 30 секунд",
             "Домашка завтра в 18:00",
             "Позвонить маме послезавтра в 9 утра",
             "Сдать зачёт 5 ноября в 14:00",

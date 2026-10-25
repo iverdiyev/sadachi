@@ -61,6 +61,21 @@ public final class TaskDateParser {
         String work=input==null?"":input.trim();
         if(work.isEmpty()) return new Result("",null,false,NO_REPEAT);
         int repeat=NO_REPEAT;
+        // Relative durations are instants, not calendar dates. Keep seconds and
+        // use the supplied clock so a two-minute reminder is exactly two minutes.
+        MatchResult relative=extract(work,BEFORE_WORD+"через\\s+(?:(\\d{1,5}|одну|один|две|два)\\s+)?(минуту|минуты|минут|мин\\.?|часа|часов|час|секунду|секунды|секунд|сек\\.?)"+AFTER_WORD);
+        if(relative!=null){
+            String amount=relative.match.group(1);
+            long count=amount==null||amount.equalsIgnoreCase("одну")||amount.equalsIgnoreCase("один")?1:
+                    amount.equalsIgnoreCase("две")||amount.equalsIgnoreCase("два")?2:Long.parseLong(amount);
+            if(count>0){
+                String unit=relative.match.group(2).toLowerCase(Locale.ROOT);
+                long seconds=count*(unit.startsWith("час")?3600:unit.startsWith("мин")?60:1);
+                String title=relative.remaining.replaceAll("\\s+"," ").replaceAll("^[,.;: \\t]+|[,.;: \\t]+$","").trim();
+                if(title.isEmpty())title="Напоминание";
+                return new Result(title,now.plusSeconds(seconds).toInstant().toEpochMilli(),true,NO_REPEAT);
+            }
+        }
         MatchResult rep=extract(work,BEFORE_WORD+"(?:каждый\\s+день|ежедневно)"+AFTER_WORD);
         if (rep!=null){repeat=DAILY;work=rep.remaining;}
         else {

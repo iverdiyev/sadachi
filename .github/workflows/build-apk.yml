@@ -1,10 +1,8 @@
-
 name: Собрать APK
-
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   apk:
@@ -13,7 +11,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -23,8 +21,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Собрать APK
-        run: gradle :app:assembleDebug --no-daemon
+      - name: Проверить парсер
+        run: |
+          mkdir -p parser-tests
+          javac -encoding UTF-8 -d parser-tests app/src/main/java/ru/svoizadachi/app/TaskDateParser.java tests/ParserTest.java
+          java -cp parser-tests ParserTest
+      - name: Тесты и сборка APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: Sadachi-APK
