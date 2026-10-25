@@ -14,6 +14,7 @@ public final class Task {
     public boolean done;
     public int repeat;
     public String description="";
+    public String descriptionHtml="";
     public String folder="";
     public final List<Item> items=new ArrayList<>();
 
@@ -32,7 +33,7 @@ public final class Task {
         JSONObject j=new JSONObject();
         j.put("id",id);j.put("title",title);j.put("dueAt",dueAt==null?JSONObject.NULL:dueAt);
         j.put("hasTime",hasTime);j.put("repeat",repeat);j.put("done",done);
-        j.put("description",description);j.put("folder",folder);
+        j.put("description",description);j.put("descriptionHtml",descriptionHtml);j.put("folder",folder);
         JSONArray checklist=new JSONArray();
         for(Item item:items){JSONObject value=new JSONObject();value.put("text",item.text);value.put("done",item.done);checklist.put(value);}
         j.put("items",checklist);
@@ -42,6 +43,7 @@ public final class Task {
         Task task=new Task(j.optLong("id"),j.optString("title"),j.isNull("dueAt")?null:j.optLong("dueAt"),
                 j.optBoolean("hasTime"),j.optInt("repeat"),j.optBoolean("done"));
         task.description=j.optString("description","");task.folder=j.optString("folder","");
+        task.descriptionHtml=j.optString("descriptionHtml","");
         JSONArray checklist=j.optJSONArray("items");
         if(checklist!=null)for(int i=0;i<checklist.length();i++){
             JSONObject item=checklist.optJSONObject(i);if(item!=null)task.items.add(new Item(item.optString("text"),item.optBoolean("done")));

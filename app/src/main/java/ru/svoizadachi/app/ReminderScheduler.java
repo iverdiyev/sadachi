@@ -44,34 +44,49 @@ public final class ReminderScheduler {
         return PendingIntent.getBroadcast(c,requestId(id),alarmIntent(c,id,due),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
     }
     public static boolean hasExactAccess(Context c){return Build.VERSION.SDK_INT<31||c.getSystemService(AlarmManager.class).canScheduleExactAlarms();}
+    public static boolean reliableMode(Context c){return state(c).getBoolean("alarm_clock_mode",false);}
+    public static void reliableMode(Context c,boolean enabled){state(c).edit().putBoolean("alarm_clock_mode",enabled).commit();scheduleAll(c,true);}
+    public static boolean unrestrictedBattery(Context c){return c.getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(c.getPackageName());}
     public static long effectiveDue(Context c,Task task){
         long snooze=state(c).getLong("snooze_"+task.id,0);
         return snooze>0?snooze:task.dueAt==null?0:task.dueAt;
     }
     public static void record(Context c,String message){state(c).edit().putString("event",message).putLong("event_time",System.currentTimeMillis()).commit();}
     public static void schedule(Context c,Task task){
+        schedule(c,task,false);
+    }
+    private static void schedule(Context c,Task task,boolean force){
         AlarmManager alarm=c.getSystemService(AlarmManager.class);
-        // Cancel the pre-0.3 alarm identity as well during migration.
-        alarm.cancel(actionIntent(c,task.id,ACTION_NOTIFY));
-        alarm.cancel(alarmPending(c,task.id,0));
         long due=effectiveDue(c,task);
-        if(task.done||!task.hasTime||due==0)return;
-        if(state(c).getLong("posted_"+task.id,0)==due)return;
+        if(task.done||!task.hasTime||due==0||state(c).getLong("posted_"+task.id,0)==due){
+            alarm.cancel(alarmPending(c,task.id,0));return;
+        }
         long now=System.currentTimeMillis();
         if(due<=now){
             // Recover a missed alarm after reboot, an update or permission grant.
             // Never flood the user with tasks overdue by several days.
-            if(now-due<=RECOVERY_WINDOW)c.sendBroadcast(alarmIntent(c,task.id,due));
+            if(now-due<=RECOVERY_WINDOW)c.sendBroadcast(alarmIntent(c,task.id,due).putExtra("recovered",true));
             else if(task.repeat!=TaskDateParser.NO_REPEAT)advanceRepeating(c,task);
             return;
         }
+        String strategy=hasExactAccess(c)?reliableMode(c)?"alarm_clock":"exact":"inexact";
+        String mode=strategy+(unrestrictedBattery(c)?":unrestricted":":optimized");
+        PendingIntent existing=PendingIntent.getBroadcast(c,requestId(task.id),alarmIntent(c,task.id,due),PendingIntent.FLAG_NO_CREATE|PendingIntent.FLAG_IMMUTABLE);
+        if(!force&&existing!=null&&state(c).getLong("scheduled_"+task.id,0)==due&&mode.equals(state(c).getString("mode_"+task.id,"")))return;
+        // Never cancel/re-arm the same future timer just because the UI resumed.
+        alarm.cancel(actionIntent(c,task.id,ACTION_NOTIFY));
         PendingIntent pending=alarmPending(c,task.id,due);
         try{
-            if(hasExactAccess(c))alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pending);
+            if(strategy.equals("alarm_clock")){
+                PendingIntent show=PendingIntent.getActivity(c,requestId(task.id),new Intent(c,MainActivity.class)
+                        .setData(Uri.parse("sadachi://alarm/"+task.id)).putExtra("open_task",task.id),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+                alarm.setAlarmClock(new AlarmManager.AlarmClockInfo(due,show),pending);
+            }
+            else if(hasExactAccess(c))alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pending);
             else alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pending);
-            state(c).edit().putLong("scheduled_"+task.id,due).commit();
+            state(c).edit().putLong("scheduled_"+task.id,due).putString("mode_"+task.id,mode).commit();
         }catch(SecurityException error){
-            try{alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pending);}
+            try{alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pending);state(c).edit().putString("mode_"+task.id,"inexact_fallback").commit();record(c,"Точное время отклонено Android; поставлен неточный таймер");}
             catch(RuntimeException failure){record(c,"Android отклонил таймер: "+failure.getClass().getSimpleName());}
         }catch(RuntimeException error){record(c,"Не удалось поставить таймер: "+error.getClass().getSimpleName());}
     }
@@ -81,20 +96,24 @@ public final class ReminderScheduler {
                 &&due<=System.currentTimeMillis()+1000&&state(c).getLong("posted_"+task.id,0)!=due;
     }
     public static void delivered(Context c,Task task,long due){
+        delivered(c,task,due,false);
+    }
+    public static void delivered(Context c,Task task,long due,boolean recovered){
         boolean snoozed=state(c).getLong("snooze_"+task.id,0)>0;
         long posted=snoozed&&task.repeat==TaskDateParser.NO_REPEAT&&task.dueAt!=null?task.dueAt:due;
         state(c).edit().putLong("posted_"+task.id,posted).remove("snooze_"+task.id).commit();
-        record(c,"Уведомление передано Android");
+        record(c,recovered?"Пропущенный таймер восстановлен при запуске/обновлении":"Фоновый таймер: уведомление передано Android");
     }
     public static void cancel(Context c,long id){
         AlarmManager alarm=c.getSystemService(AlarmManager.class);
         alarm.cancel(alarmPending(c,id,0));alarm.cancel(actionIntent(c,id,ACTION_NOTIFY));
         Intent legacy=new Intent(c,ReminderReceiver.class).setAction(ACTION_NOTIFY).putExtra(EXTRA_ID,id).putExtra("snoozed",true);
         alarm.cancel(PendingIntent.getBroadcast(c,requestId(id)+300000000,legacy,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
-        state(c).edit().remove("snooze_"+id).remove("scheduled_"+id).remove("posted_"+id).commit();
+        state(c).edit().remove("snooze_"+id).remove("scheduled_"+id).remove("posted_"+id).remove("mode_"+id).commit();
         c.getSystemService(NotificationManager.class).cancel(requestId(id));
     }
-    public static void scheduleAll(Context c){createChannel(c);for(Task task:new TaskStore(c).all())schedule(c,task);}
+    public static void scheduleAll(Context c){scheduleAll(c,false);}
+    public static void scheduleAll(Context c,boolean force){createChannel(c);for(Task task:new TaskStore(c).all())schedule(c,task,force);}
     public static void snooze(Context c,long id){
         Task task=new TaskStore(c).find(id);if(task==null||task.done)return;
         state(c).edit().putLong("snooze_"+id,System.currentTimeMillis()+10*60*1000L).commit();
@@ -113,6 +132,9 @@ public final class ReminderScheduler {
         return "Уведомления: "+(notificationsEnabled(c)?"разрешены":"выключены")
                 +"\nТочные таймеры: "+(hasExactAccess(c)?"разрешены":"нет доступа — возможна задержка")
                 +"\nОптимизация батареи: "+(power.isIgnoringBatteryOptimizations(c.getPackageName())?"без ограничений":"включена")
+                +"\nНадёжный режим Android: "+(reliableMode(c)?"включён (системный будильник)":"выключен")
+                +"\nЭнергосбережение системы: "+(power.isPowerSaveMode()?"включено":"выключено")
+                +"\nОграничение фона Android: "+(Build.VERSION.SDK_INT>=28&&c.getSystemService(ActivityManager.class).isBackgroundRestricted()?"включено":"не обнаружено")
                 +"\n\nПоследнее событие:\n"+event;
     }
 }

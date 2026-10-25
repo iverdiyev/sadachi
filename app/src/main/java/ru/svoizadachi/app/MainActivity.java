@@ -62,7 +62,9 @@ public final class MainActivity extends Activity {
     private TextSwitcher hints;
     private int hintIndex;
     private final Set<Long> expanded=new HashSet<>();
-    private static final String[] HINTS={"Что нужно сделать сегодня?", "Напиши, что сделать через час", "Например: чай через 2 минуты", "Разбей большую задачу на маленькие шаги"};
+    private final Map<Long,CharSequence> noteDrafts=new HashMap<>();
+    private boolean inlineEditing;
+    private static final String[] HINTS={"Что нужно сделать сегодня?", "Напиши, что сделать через час", "Например: чай через 2 минуты", "Первая строка — заголовок, дальше — описание"};
     private final Runnable hintTick=new Runnable(){
         @Override public void run(){
             if(hints!=null&&entry.length()==0&&!entry.hasFocus()&&motion())hints.setText(HINTS[(++hintIndex)%HINTS.length]);
@@ -73,7 +75,7 @@ public final class MainActivity extends Activity {
     private final Runnable previewUpdate=()->updatePreview();
     private final Runnable clockTick=new Runnable(){
         @Override public void run(){
-            if(cards!=null){refresh(false);updatePreview();}
+            if(cards!=null){if(!inlineEditing)refresh(false);updatePreview();}
             handler.postDelayed(this,60000);
         }
     };
@@ -96,6 +98,7 @@ public final class MainActivity extends Activity {
         if(state!=null){
             filter=state.getInt("filter",0);selectedFolder=state.getString("folder");
             if(state.containsKey("draft_due")){draftDue=state.getLong("draft_due");draftHasTime=state.getBoolean("draft_time");}
+            long[] drafts=state.getLongArray("note_draft_ids");if(drafts!=null)for(long id:drafts){CharSequence text=state.getCharSequence("note_draft_"+id);if(text!=null){noteDrafts.put(id,text);expanded.add(id);}}
         }
         buildInterface();
         if(state!=null){entry.setText(state.getString("draft",""));entry.setSelection(entry.length());}
@@ -115,6 +118,9 @@ public final class MainActivity extends Activity {
         state.putInt("filter",filter);state.putString("draft",entry.getText().toString());
         state.putString("folder",selectedFolder);
         if(draftDue!=null){state.putLong("draft_due",draftDue);state.putBoolean("draft_time",draftHasTime);}
+        long[] ids=new long[noteDrafts.size()];int index=0;for(Map.Entry<Long,CharSequence> draft:noteDrafts.entrySet()){
+            ids[index++]=draft.getKey();state.putCharSequence("note_draft_"+draft.getKey(),draft.getValue());
+        }state.putLongArray("note_draft_ids",ids);
         super.onSaveInstanceState(state);
     }
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);openWidgetIntent(intent);}
@@ -198,6 +204,9 @@ public final class MainActivity extends Activity {
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=label("Входящие",30,TEXT,true);
         heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        TextView theme=label(dark?"☀":"☾",24,PURPLE,true);theme.setGravity(Gravity.CENTER);
+        theme.setContentDescription(dark?"Включить светлую тему":"Включить тёмную тему");touchBackground(theme,CARD,24);
+        heading.addView(theme,lp(48,48));theme.setOnClickListener(v->{ThemeSettings.setMode(this,dark?1:2);TaskWidgetProvider.updateAll(this);recreate();});
         TextView settings=label("⋯",26,PURPLE,true);settings.setGravity(Gravity.CENTER);
         settings.setContentDescription("Настройки приложения");touchBackground(settings,CARD,18);
         heading.addView(settings,lp(48,48));settings.setOnClickListener(v->showAppSettings());
@@ -227,7 +236,7 @@ public final class MainActivity extends Activity {
         undoBar.addView(undo,lp(96,48));undo.setOnClickListener(v->{if(undoAction!=null)undoAction.run();handler.removeCallbacks(hideUndo);hideUndo.run();});
         LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
         LinearLayout composer=column();composer.setPadding(dp(16),dp(10),dp(16),dp(12));
-        composer.setBackground(border(CARD,22));
+        composer.setBackground(border(CARD,28));
         hints=new TextSwitcher(this);hints.setFactory(()->label("",12,SUBTLE,false));hints.setCurrentText(HINTS[0]);
         android.view.animation.AnimationSet hintIn=new android.view.animation.AnimationSet(true);
         hintIn.addAnimation(new android.view.animation.AlphaAnimation(0,1));hintIn.addAnimation(new android.view.animation.TranslateAnimation(0,0,dp(5),0));hintIn.setDuration(220);
@@ -239,7 +248,7 @@ public final class MainActivity extends Activity {
         entry.setContentDescription("Название задачи и время напоминания");
         entry.setBackgroundColor(Color.TRANSPARENT);entry.setPadding(0,dp(8),0,dp(8));
         entry.setMinLines(1);entry.setMaxLines(5);entry.setGravity(Gravity.TOP|Gravity.START);
-        entry.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        entry.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         entry.setImeOptions(EditorInfo.IME_ACTION_DONE);composer.addView(entry,lp(-1,-2));
         dateChip=label(DateTimePicker.format(draftDue,draftHasTime),12,PURPLE,true);dateChip.setPadding(dp(10),dp(12),dp(10),dp(12));
         dateChip.setMinHeight(dp(48));touchBackground(dateChip,BACKGROUND,12);
@@ -332,7 +341,9 @@ public final class MainActivity extends Activity {
         String raw=entry.getText().toString().trim();
         if(raw.isEmpty()){entry.setError("Напиши, что нужно сделать");entry.requestFocus();return;}
         TaskDateParser.Result parsed=parsedEntry();
-        Task task=new Task(store.allocateId(),parsed.title,parsed.dueAt,parsed.hasTime,parsed.repeat,false);
+        String[] lines=raw.split("\\R",2);
+        Task task=new Task(store.allocateId(),lines.length==1?parsed.title:TaskDateParser.parse(lines[0]).title,parsed.dueAt,parsed.hasTime,parsed.repeat,false);
+        if(lines.length>1)task.description=lines[1].trim();
         task.folder=selectedFolder==null?"":selectedFolder;
         store.upsert(task);ReminderScheduler.schedule(this,task);
         draftDue=null;draftHasTime=false;dateChip.setText("Выбрать дату");
@@ -349,11 +360,11 @@ public final class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},17);return;
         }
-        maybeAskExact();
+        if(ReminderScheduler.hasExactAccess(this))maybeAskBackground();else maybeAskExact();
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
         super.onRequestPermissionsResult(request,permissions,results);
-        if(request==17){ReminderScheduler.scheduleAll(this);refresh(false);if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)maybeAskExact();}
+        if(request==17){ReminderScheduler.scheduleAll(this);refresh(false);if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)ensureReminderAccess();}
     }
     private void maybeAskExact(){
         if(Build.VERSION.SDK_INT>=31&&!ReminderScheduler.hasExactAccess(this)&&!askedExact){
@@ -375,7 +386,8 @@ public final class MainActivity extends Activity {
     private void showReminderSettings(){
         String[] options={"Уведомления: "+(notificationsEnabled()?"включены":"выключены"),
                 "Точное время: "+(ReminderScheduler.hasExactAccess(this)?"разрешено":"нужно разрешить"),
-                "Фоновая работа на OnePlus", "Проверить уведомление сейчас", "Таймер на 10 секунд", "Диагностика"};
+                "Фоновая работа на OnePlus", "Проверить уведомление сейчас", "Таймер на 10 секунд", "Диагностика",
+                "Надёжный режим: "+(ReminderScheduler.reliableMode(this)?"включён":"выключен")};
         new AlertDialog.Builder(this).setTitle("Настройки напоминаний").setItems(options,(d,which)->{
             if(which==0){
                 if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED
@@ -383,9 +395,7 @@ public final class MainActivity extends Activity {
                 else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));
             }
             else if(which==1){if(Build.VERSION.SDK_INT>=31)openExactSettings();else Toast.makeText(this,"Точные напоминания доступны",Toast.LENGTH_SHORT).show();}
-            else if(which==2)new AlertDialog.Builder(this).setTitle("Напоминания на OnePlus")
-                    .setMessage("В настройках приложения открой «Использование батареи» и разреши фоновую работу, если уведомления задерживаются. Названия пунктов зависят от OxygenOS. Принудительная остановка приложения отключает напоминания до следующего открытия.")
-                    .setNegativeButton("Понятно",null).setPositiveButton("Настройки приложения",(a,b)->openAppSettings()).show();
+            else if(which==2)backgroundSetup();
             else if(which==3){
                 boolean posted=ReminderReceiver.post(this,null);
                 ReminderScheduler.record(this,posted?"Тест передан Android":"Тест заблокирован настройками уведомлений");
@@ -396,6 +406,9 @@ public final class MainActivity extends Activity {
                 Task test=new Task(store.allocateId(),"Проверка напоминаний",System.currentTimeMillis()+10000,true,0,false);
                 store.upsert(test);ReminderScheduler.schedule(this,test);refresh(true);ensureReminderAccess();
                 Toast.makeText(this,ReminderScheduler.hasExactAccess(this)?"Заблокируй экран. Напоминание через 10 секунд":"Без доступа к точным таймерам Android может задержать тест",Toast.LENGTH_LONG).show();
+            }else if(which==6){
+                if(ReminderScheduler.reliableMode(this)){ReminderScheduler.reliableMode(this,false);refresh(false);}
+                else reliableSetup();
             }else new AlertDialog.Builder(this).setTitle("Диагностика напоминаний")
                     .setMessage(ReminderScheduler.diagnostics(this)).setPositiveButton("Закрыть",null)
                     .setNeutralButton("Скопировать",(a,b)->{
@@ -403,6 +416,28 @@ public final class MainActivity extends Activity {
                                 android.content.ClipData.newPlainText("Диагностика",ReminderScheduler.diagnostics(this)));
                     }).show();
         }).setNegativeButton("Закрыть",null).show();
+    }
+    private void maybeAskBackground(){
+        if(!ReminderScheduler.unrestrictedBattery(this)&&!ReminderScheduler.reliableMode(this)
+                &&!getPreferences(MODE_PRIVATE).getBoolean("background_help_seen",false)){
+            getPreferences(MODE_PRIVATE).edit().putBoolean("background_help_seen",true).apply();backgroundSetup();
+        }
+    }
+    private void backgroundSetup(){
+        new AlertDialog.Builder(this).setTitle("Напоминания с выключенным экраном")
+                .setMessage("Прошивка может откладывать таймеры в фоне, даже когда уведомления и точное время разрешены. Разреши работу без оптимизации батареи. На OnePlus также проверь «Использование батареи → Разрешить фоновую работу». Если задержки останутся, включи надёжный режим Android. Принудительную остановку приложения обойти нельзя.")
+                .setNegativeButton("Позже",null).setNeutralButton("Надёжный режим",(d,w)->reliableSetup())
+                .setPositiveButton("Разрешить фон",(d,w)->{
+                    try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}
+                    catch(RuntimeException e){openAppSettings();}
+                }).show();
+    }
+    private void reliableSetup(){
+        new AlertDialog.Builder(this).setTitle("Надёжный режим Android")
+                .setMessage("Напоминания будут ставиться через системный API будильника, а не обычный таймер. Android может показывать значок и время ближайшего будильника. Это не воспроизводит мелодию будильника: приложение по-прежнему показывает уведомление. Режим можно выключить здесь же.")
+                .setNegativeButton("Отмена",null).setPositiveButton("Включить",(d,w)->{
+                    ReminderScheduler.reliableMode(this,true);refresh(false);if(!ReminderScheduler.hasExactAccess(this))maybeAskExact();
+                }).show();
     }
     private void showAppSettings(){
         new AlertDialog.Builder(this).setTitle("Настройки")
@@ -455,9 +490,10 @@ public final class MainActivity extends Activity {
         countLabel.setText(filter==3?"Завершённые задачи":"Мои задачи · "+active);
         boolean notifications=notificationsEnabled(),exact=ReminderScheduler.hasExactAccess(this);
         boolean timedTasks=tasks.stream().anyMatch(t->!t.done&&t.hasTime&&t.dueAt!=null);
-        permissionCard.setVisibility(!timedTasks||notifications&&exact?View.GONE:View.VISIBLE);
+        boolean background=ReminderScheduler.unrestrictedBattery(this)||ReminderScheduler.reliableMode(this);
+        permissionCard.setVisibility(!timedTasks||notifications&&exact&&background?View.GONE:View.VISIBLE);
         permissionText.setText(!notifications?"Уведомления выключены. Нажми, чтобы разрешить напоминания.":
-                "Для точного времени нужно разрешение Android. Нажми, чтобы настроить.");
+                !exact?"Для точного времени нужно разрешение Android. Нажми, чтобы настроить.":"Фон может ограничиваться прошивкой. Нажми → «Фоновая работа» или «Надёжный режим». ");
         renderChips();cards.removeAllViews();int displayed=0;LocalDate today=LocalDate.now();
         for(Task task:tasks){
             if(filter==3&&!task.done||filter!=3&&task.done)continue;
@@ -478,7 +514,7 @@ public final class MainActivity extends Activity {
     }
     private View createCard(Task task){
         SwipeTaskLayout row=new SwipeTaskLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(6),dp(10),dp(6),dp(10));row.setBackground(border(CARD,18));
+        row.setPadding(dp(6),dp(12),dp(6),dp(12));row.setBackground(border(CARD,26));
         LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(10);cards.addView(row,p);
         CheckBox done=new CheckBox(this);done.setButtonTintList(ColorStateList.valueOf(task.done?GREEN:PURPLE));
         done.setContentDescription((task.done?"Вернуть задачу: ":"Завершить задачу: ")+task.title);
@@ -494,14 +530,34 @@ public final class MainActivity extends Activity {
         TextView summary=label((task.folder.isEmpty()?"":task.folder+" · ")+(task.items.isEmpty()?"Раскрыть заметку ▾":task.completedItems()+"/"+task.items.size()+" пунктов ▾"),12,SUBTLE,false);
         LinearLayout.LayoutParams summaryLp=lp(-1,-2);summaryLp.topMargin=dp(7);text.addView(summary,summaryLp);
         LinearLayout details=column();details.setVisibility(expanded.contains(task.id)?View.VISIBLE:View.GONE);text.addView(details,lp(-1,-2));
+        row.setSwipeEnabled(!expanded.contains(task.id));
         gap(details,12);
-        TextView description=label(task.description.isEmpty()?"Добавь описание или чек-лист через «Редактировать»":task.description,14,SUBTLE,false);
-        description.setTextIsSelectable(true);details.addView(description,lp(-1,-2));
+        EditText description=new EditText(this);description.setTextSize(15);description.setTextColor(TEXT);description.setHintTextColor(SUBTLE);
+        description.setHint("Дописать описание…");description.setMinLines(2);description.setMaxLines(8);
+        description.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        description.setBackground(bg(BACKGROUND,18));description.setPadding(dp(12),dp(10),dp(12),dp(10));
+        description.setText(noteDrafts.containsKey(task.id)?noteDrafts.get(task.id):NoteFormatting.load(task));
+        description.setOnFocusChangeListener((v,focused)->inlineEditing=focused);
+        Runnable retainDraft=()->noteDrafts.put(task.id,new android.text.SpannableStringBuilder(description.getText()));
+        details.addView(NoteFormatting.toolbar(this,description,retainDraft),lp(-1,-2));details.addView(description,lp(-1,-2));
+        TextView saveNote=label("Сохранить описание",13,PURPLE,true);saveNote.setMinHeight(dp(48));touchBackground(saveNote,BACKGROUND,16);
+        details.addView(saveNote,lp(-1,-2));saveNote.setOnClickListener(v->saveInline(task,description,null));
+        TextView detected=label("",12,PURPLE,true);detected.setMinHeight(dp(48));detected.setVisibility(View.GONE);details.addView(detected,lp(-1,-2));
+        description.addTextChangedListener(new TextWatcher(){
+            @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            @Override public void afterTextChanged(Editable value){retainDraft.run();}
+            @Override public void onTextChanged(CharSequence s,int start,int before,int count){
+                TaskDateParser.Result result=TaskDateParser.parse(s.toString());detected.setVisibility(result.dueAt==null?View.GONE:View.VISIBLE);
+                if(result.dueAt!=null)detected.setText("Сохранить и назначить: "+DateTimePicker.format(result.dueAt,result.hasTime));
+            }
+        });
+        detected.setOnClickListener(v->saveInline(task,description,TaskDateParser.parse(description.getText().toString())));
         for(Task.Item item:task.items){
             CheckBox bullet=new CheckBox(this);bullet.setText(item.text);bullet.setTextSize(14);bullet.setTextColor(TEXT);bullet.setMinHeight(dp(48));
             bullet.setButtonTintList(ColorStateList.valueOf(PURPLE));bullet.setChecked(item.done);
             bullet.setOnCheckedChangeListener((v,checked)->{
-                item.done=checked;store.upsert(task);summary.setText(task.completedItems()+"/"+task.items.size()+" пунктов ▾");
+                item.done=checked;Task current=store.find(task.id);int index=task.items.indexOf(item);
+                if(current!=null&&index>=0&&index<current.items.size()){current.items.get(index).done=checked;store.upsert(current);summary.setText(current.completedItems()+"/"+current.items.size()+" пунктов ▾");}
                 if(motion())bullet.animate().alpha(.65f).setDuration(80).withEndAction(()->bullet.animate().alpha(1).setDuration(140).start()).start();
             });details.addView(bullet,lp(-1,-2));
         }
@@ -511,6 +567,7 @@ public final class MainActivity extends Activity {
             boolean open=details.getVisibility()!=View.VISIBLE;
             if(motion())android.transition.TransitionManager.beginDelayedTransition(cards,new android.transition.AutoTransition().setDuration(180));
             if(open)expanded.add(task.id);else expanded.remove(task.id);details.setVisibility(open?View.VISIBLE:View.GONE);
+            row.setSwipeEnabled(!open);
         });
         text.setFocusable(true);text.setContentDescription(task.title+". "+taskDate(task)+". Раскрыть описание и чек-лист");
         TextView more=label("⋮",24,SUBTLE,false);more.setGravity(Gravity.CENTER);
@@ -519,6 +576,16 @@ public final class MainActivity extends Activity {
         row.onComplete(()->completeTask(task,!task.done,row,title));
         done.setOnCheckedChangeListener((v,checked)->{done.setEnabled(false);completeTask(task,checked,row,title);});
         return row;
+    }
+    private void saveInline(Task original,EditText editor,TaskDateParser.Result timing){
+        Task task=store.find(original.id);if(task==null)return;
+        NoteFormatting.save(task,editor.getText());
+        if(timing!=null&&timing.dueAt!=null){ReminderScheduler.cancel(this,task.id);task.dueAt=timing.dueAt;task.hasTime=timing.hasTime;task.repeat=timing.repeat;}
+        store.upsert(task);if(timing!=null)ReminderScheduler.schedule(this,task);
+        noteDrafts.remove(task.id);inlineEditing=false;
+        ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(editor.getWindowToken(),0);
+        root.requestFocus();refresh(false);
+        Toast.makeText(this,"Описание сохранено",Toast.LENGTH_SHORT).show();if(timing!=null&&task.hasTime)ensureReminderAccess();
     }
     private void completeTask(Task task,boolean checked,View row,TextView title){
         boolean previous=task.done;if(checked==previous)return;
@@ -571,7 +638,12 @@ public final class MainActivity extends Activity {
         }).show();
     }
     private void editTask(Task task){
-        TaskEditor.show(this,task,()->{expanded.add(task.id);refresh(true);Task updated=store.find(task.id);if(updated!=null&&updated.hasTime&&!updated.done)ensureReminderAccess();});
+        Task initial=store.find(task.id);if(initial==null)return;
+        if(noteDrafts.containsKey(task.id))NoteFormatting.save(initial,noteDrafts.get(task.id));
+        TaskEditor.show(this,initial,()->{
+            noteDrafts.remove(task.id);inlineEditing=false;expanded.add(task.id);refresh(true);
+            Task updated=store.find(task.id);if(updated!=null&&updated.hasTime&&!updated.done)ensureReminderAccess();
+        });
     }
     private void showFolders(){
         List<String> folders=store.folders();List<String> options=new ArrayList<>();

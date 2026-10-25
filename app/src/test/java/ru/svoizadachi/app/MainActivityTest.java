@@ -74,4 +74,26 @@ public class MainActivityTest {
             }
         }
     }
+    @Test public void multilineInputUsesTitleAndDetectsTimeInBody(){
+        try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            MainActivity activity=controller.get();ViewGroup root=content(activity);
+            find(root,EditText.class,null).setText("Проект\nОтправить завтра в 18:00 документы");
+            find(root,TextView.class,"＋  Добавить задачу").performClick();
+            Task task=new TaskStore(activity).all().get(0);
+            assertEquals("Проект",task.title);assertEquals("Отправить завтра в 18:00 документы",task.description);
+            assertTrue(task.hasTime);assertNotNull(task.dueAt);
+        }
+    }
+    @Test public void expandedNoteDraftSurvivesRotationUntilExplicitSave(){
+        TaskStore store=new TaskStore(org.robolectric.RuntimeEnvironment.getApplication());
+        Task task=new Task(store.allocateId(),"Моя заметка",null,false,0,false);task.description="Старое описание";store.upsert(task);
+        try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            TextView title=find(content(controller.get()),TextView.class,"Моя заметка");((View)title.getParent()).performClick();
+            find(content(controller.get()),EditText.class,null).setText("Новое описание");
+            assertEquals("Старое описание",store.find(task.id).description);
+            controller.recreate();assertEquals("Новое описание",find(content(controller.get()),EditText.class,null).getText().toString());
+            find(content(controller.get()),TextView.class,"Сохранить описание").performClick();
+            assertEquals("Новое описание",store.find(task.id).description);
+        }
+    }
 }

@@ -51,13 +51,20 @@ jobs:
           name: test-reports
           path: app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
+      - name: Демонстрационные скриншоты
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: app/build/screenshots/*.png
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Sadachi-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Опубликовать APK и сведения об обновлении
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && hashFiles('docs/screenshots/light.png') != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/publish-release.py

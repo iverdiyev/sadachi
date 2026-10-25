@@ -26,6 +26,7 @@ manifest = directory / "update.json"
 manifest.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 exists = subprocess.run(["gh", "release", "view", tag], capture_output=True).returncode == 0
 assets = [str(apk), str(manifest)]
+assets.extend(str(path) for path in sorted(Path("docs/screenshots").glob("*.png")))
 if exists:
     subprocess.run(["gh", "release", "upload", tag, *assets, "--clobber"], check=True)
 else:
@@ -33,6 +34,6 @@ else:
         "gh", "release", "create", tag, *assets,
         "--target", os.environ["GITHUB_SHA"], "--latest",
         "--title", f"Свои задачи {version}",
-        "--notes", "Папки, описания и чек-листы, выбор даты, виджеты, темы и проверка обновлений.\n\n"
-        "Изменения и инструкции — в README и CHANGELOG.md. Тестовая сборка; установка подтверждается Android.",
+        "--notes", Path("CHANGELOG.md").read_text(encoding="utf-8").split("\n# ",1)[0]
+        + "\n\nИнструкции и скриншоты — в README. Тестовая сборка; установка подтверждается Android.",
     ], check=True)

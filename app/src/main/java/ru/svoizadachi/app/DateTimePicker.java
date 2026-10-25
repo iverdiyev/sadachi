@@ -19,7 +19,7 @@ public final class DateTimePicker {
             TimePickerDialog time=new TimePickerDialog(activity,(view,hour,minute)->
                     callback.selected(date.atTime(hour,minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),true),
                     initial.getHour(),initial.getMinute(),true);
-            time.setTitle("Время напоминания");time.show();
+            time.setTitle("Время напоминания");time.show();RoundedUi.dialog(time);
         },initial.getYear(),initial.getMonthValue()-1,initial.getDayOfMonth());
         dialog.setTitle("Дата задачи");
         dialog.setButton(AlertDialog.BUTTON_NEUTRAL,"Без времени",(d,w)->{
@@ -27,6 +27,6 @@ public final class DateTimePicker {
             picker.clearFocus();
             callback.selected(LocalDate.of(picker.getYear(),picker.getMonth()+1,picker.getDayOfMonth())
                     .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),false);
-        });dialog.show();
+        });dialog.show();RoundedUi.dialog(dialog);
     }
 }

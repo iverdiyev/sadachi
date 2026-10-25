@@ -13,9 +13,12 @@ public final class SwipeTaskLayout extends LinearLayout {
     private boolean swiping;
     private final int slop;
     private Runnable complete;
+    private boolean swipeEnabled=true;
     public SwipeTaskLayout(Context c){super(c);slop=ViewConfiguration.get(c).getScaledTouchSlop();}
     public void onComplete(Runnable action){complete=action;}
+    public void setSwipeEnabled(boolean enabled){swipeEnabled=enabled;}
     @Override public boolean onInterceptTouchEvent(MotionEvent event){
+        if(!swipeEnabled)return false;
         if(event.getActionMasked()==MotionEvent.ACTION_DOWN){startX=event.getRawX();startY=event.getRawY();swiping=false;delta=0;}
         else if(event.getActionMasked()==MotionEvent.ACTION_MOVE){
             float x=event.getRawX()-startX,y=event.getRawY()-startY;

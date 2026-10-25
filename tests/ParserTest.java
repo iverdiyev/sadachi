@@ -32,12 +32,22 @@ public class ParserTest {
         has("Чай через одну минуту","Чай","2026-10-24T18:31",true,0,now);
         has("Таймер через 30 секунд","Таймер","2026-10-24T18:30:30",true,0,now);
         has("Вода через 5 мин","Вода","2026-10-24T18:35",true,0,now);
+        has("Завтра позвонить маме в 9 утра","позвонить маме","2026-10-25T09:00",true,0,now);
+        has("Позвонить завтра маме в 9 утра","Позвонить маме","2026-10-25T09:00",true,0,now);
+        has("Через пять минут проверить чай","проверить чай","2026-10-24T18:35",true,0,now);
+        has("Проверить через час и 30 минут духовку","Проверить духовку","2026-10-24T20:00",true,0,now);
+        has("Через полчаса сделать перерыв","сделать перерыв","2026-10-24T19:00",true,0,now);
+        has("Повторить через две недели материал","Повторить материал","2026-11-07T00:00",false,0,now);
+        has("Встреча 5 ноября 2027 в 14:00","Встреча","2027-11-05T14:00",true,0,now);
+        has("Встреча в 10.11 завтра","Встреча","2026-10-25T10:11",true,0,now);
+        has("План\nОтправить завтра в 18:00 документы","План Отправить документы","2026-10-25T18:00",true,0,now);
         ZonedDateTime late=now.withHour(23).withMinute(59).withSecond(20);
         TaskDateParser.Result midnight=TaskDateParser.parse("Сон через 2 минуты",late);
         check(midnight.dueAt==late.plusMinutes(2).toInstant().toEpochMilli(),"relative duration across midnight preserves seconds");
         check(TaskDateParser.parse("Таймер через 0 минут",now).dueAt==null,"zero duration is not scheduled");
         // Simulate typing each character: the original app crashed on the first keystroke.
         String[] typed = {
+            "Проверить через час и 30 минут духовку", "Через пять минут проверить чай", "Повторить через две недели материал",
             "Чай через 2 минуты", "Перерыв через час", "Таймер через 30 секунд",
             "Домашка завтра в 18:00",
             "Позвонить маме послезавтра в 9 утра",

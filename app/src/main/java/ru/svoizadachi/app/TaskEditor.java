@@ -23,16 +23,40 @@ public final class TaskEditor {
         TextView view=new TextView(activity);view.setText(text);view.setTextSize(13);view.setTextColor(ThemeSettings.subtle(activity));
         view.setPadding(0,dp(16),0,dp(6));parent.addView(view);
     }
-    private Button button(String text){Button button=new Button(activity);button.setText(text);button.setAllCaps(false);button.setMinHeight(dp(48));return button;}
+    private Button button(String text){
+        Button button=new Button(activity);button.setText(text);button.setAllCaps(false);button.setMinHeight(dp(48));
+        android.graphics.drawable.GradientDrawable shape=RoundedUi.background(activity,18);
+        shape.setColor(ThemeSettings.dark(activity)?0xFF2A354B:0xFFEDF1FC);button.setBackgroundTintList(null);button.setBackground(shape);
+        button.setTextColor(ThemeSettings.dark(activity)?0xFFB6C8FF:0xFF375DBB);button.setPadding(dp(12),dp(8),dp(12),dp(8));return button;
+    }
     private EditText input(String hint,String value){
         EditText edit=new EditText(activity);edit.setText(value);edit.setHint(hint);edit.setTextSize(16);edit.setTextColor(ThemeSettings.text(activity));
         edit.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        android.graphics.drawable.GradientDrawable background=RoundedUi.background(activity,18);
+        background.setColor(ThemeSettings.dark(activity)?0xFF121722:0xFFF5F7FD);edit.setBackgroundTintList(null);edit.setBackground(background);edit.setPadding(dp(14),dp(12),dp(14),dp(12));
         edit.setMaxLines(8);return edit;
     }
     private void show(){
         ScrollView scroll=new ScrollView(activity);LinearLayout form=column();form.setPadding(dp(20),dp(8),dp(20),dp(16));scroll.addView(form);
         heading(form,"Название");EditText title=input("Название заметки или задачи",task.title);form.addView(title);
-        heading(form,"Описание");EditText description=input("Подробности, ссылки, мысли…",task.description);description.setMinLines(3);form.addView(description);
+        heading(form,"Описание");EditText description=input("Подробности, ссылки, мысли…","");description.setText(NoteFormatting.load(task));description.setMinLines(3);
+        form.addView(NoteFormatting.toolbar(activity,description));form.addView(description);
+        Button detected=button("Найти дату в тексте");detected.setVisibility(View.GONE);form.addView(detected);
+        Runnable detect=()->{
+            TaskDateParser.Result parsed=TaskDateParser.parse(title.getText()+"\n"+description.getText());
+            detected.setVisibility(parsed.dueAt==null?View.GONE:View.VISIBLE);
+            if(parsed.dueAt!=null)detected.setText("Использовать: "+DateTimePicker.format(parsed.dueAt,parsed.hasTime));
+        };
+        android.text.TextWatcher watcher=new android.text.TextWatcher(){
+            @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            @Override public void onTextChanged(CharSequence s,int start,int before,int count){detect.run();}
+            @Override public void afterTextChanged(android.text.Editable value){}
+        };
+        title.addTextChangedListener(watcher);description.addTextChangedListener(watcher);detect.run();
+        detected.setOnClickListener(v->{
+            TaskDateParser.Result parsed=TaskDateParser.parse(title.getText()+"\n"+description.getText());
+            if(parsed.dueAt!=null){due=parsed.dueAt;hasTime=parsed.hasTime;dateChanged=true;dateButton.setText(DateTimePicker.format(due,hasTime));}
+        });
         heading(form,"Папка");
         List<String> folders=new ArrayList<>();folders.add("Без папки");folders.addAll(new TaskStore(activity).folders());
         Spinner folder=new Spinner(activity);folder.setMinimumHeight(dp(48));folder.setContentDescription("Папка заметки");
@@ -56,7 +80,7 @@ public final class TaskEditor {
             String raw=title.getText().toString().trim();if(raw.isEmpty()){title.setError("Нужно название");title.requestFocus();return;}
             TaskDateParser.Result parsed=TaskDateParser.parse(raw);
             Task current=new TaskStore(activity).find(task.id);if(current==null){dialog.dismiss();return;}
-            current.title=parsed.title;current.description=description.getText().toString().trim();
+            current.title=parsed.title;NoteFormatting.save(current,description.getText());
             current.folder=folder.getSelectedItemPosition()==0?"":folders.get(folder.getSelectedItemPosition());
             if(dateChanged){current.dueAt=due;current.hasTime=hasTime;}
             else if(parsed.dueAt!=null){current.dueAt=parsed.dueAt;current.hasTime=parsed.hasTime;}
@@ -69,6 +93,7 @@ public final class TaskEditor {
             new TaskStore(activity).upsert(current);if(timingChanged)ReminderScheduler.schedule(activity,current);
             dialog.dismiss();saved.run();
         }));dialog.show();
+        RoundedUi.dialog(dialog);
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
     private void addItem(String text,boolean done){

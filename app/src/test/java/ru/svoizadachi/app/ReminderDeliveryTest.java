@@ -41,6 +41,21 @@ public class ReminderDeliveryTest {
         assertNotNull(alarm);assertEquals(task.dueAt.longValue(),alarm.getTriggerAtMs());
         assertEquals(AlarmManager.RTC_WAKEUP,alarm.getType());assertTrue(alarm.isAllowWhileIdle());assertEquals(0,alarm.getWindowLengthMs());
     }
+    @Test public void openingAppDoesNotReplaceExistingFutureAlarm(){
+        Task task=task(System.currentTimeMillis()+120000,0);ReminderScheduler.schedule(context,task);
+        ShadowAlarmManager.ScheduledAlarm original=shadowOf(alarms).peekNextScheduledAlarm();
+        ReminderScheduler.scheduleAll(context);
+        assertSame(original,shadowOf(alarms).peekNextScheduledAlarm());
+        ReminderScheduler.scheduleAll(context,true);
+        assertNotSame(original,shadowOf(alarms).peekNextScheduledAlarm());
+    }
+    @Test public void reliableModeUsesSystemAlarmClockOnlyWithExactPermission(){
+        ReminderScheduler.reliableMode(context,true);
+        Task task=task(System.currentTimeMillis()+120000,0);ReminderScheduler.schedule(context,task);
+        assertNotNull(shadowOf(alarms).peekNextScheduledAlarm().getAlarmClockInfo());
+        ShadowAlarmManager.setCanScheduleExactAlarms(false);ReminderScheduler.scheduleAll(context,true);
+        assertNull(shadowOf(alarms).peekNextScheduledAlarm().getAlarmClockInfo());
+    }
     @Test public void deniedExactAccessUsesInexactFallback(){
         ShadowAlarmManager.setCanScheduleExactAlarms(false);
         ReminderScheduler.schedule(context,task(System.currentTimeMillis()+120000,0));

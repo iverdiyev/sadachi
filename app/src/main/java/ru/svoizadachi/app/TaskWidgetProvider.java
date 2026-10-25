@@ -43,18 +43,24 @@ public class TaskWidgetProvider extends AppWidgetProvider {
         view.setInt(R.id.widget_root,"setBackgroundResource",ThemeSettings.dark(c)?R.drawable.widget_background_dark:R.drawable.widget_background);
         view.setTextColor(R.id.widget_title,ThemeSettings.text(c));view.setTextColor(R.id.widget_count,ThemeSettings.subtle(c));
         view.setTextColor(R.id.widget_empty,ThemeSettings.subtle(c));
+        view.setTextColor(R.id.widget_footer,ThemeSettings.dark(c)?0xFFB6C8FF:0xFF375DBB);
         List<Task> tasks=visibleTasks(new TaskStore(c).all(),today);
         view.setTextViewText(R.id.widget_title,today?"Сегодня":"Свои задачи");
         view.setTextViewText(R.id.widget_count,tasks.isEmpty()?"Нет активных задач":tasks.size()+" задач");
         view.setOnClickPendingIntent(R.id.widget_add,open(c,-1,true));
         view.setOnClickPendingIntent(R.id.widget_title,open(c,-1,false));
+        view.setOnClickPendingIntent(R.id.widget_footer,open(c,-1,false));
+        List<Task> all=new TaskStore(c).all();long completed=all.stream().filter(t->t.done).count();
+        view.setProgressBar(R.id.widget_progress,100,all.isEmpty()?0:(int)(100*completed/all.size()),false);
         view.removeAllViews(R.id.widget_rows);
         Bundle options=manager.getAppWidgetOptions(id);
         int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,250);
-        int limit=Math.max(1,Math.min(5,(height-100)/64));
+        int limit=Math.max(1,Math.min(5,(height-140)/72));
         for(int i=0;i<Math.min(limit,tasks.size());i++){
             Task task=tasks.get(i);RemoteViews row=new RemoteViews(c.getPackageName(),R.layout.widget_task_row);
             row.setTextColor(R.id.widget_task_title,ThemeSettings.text(c));row.setTextColor(R.id.widget_task_detail,ThemeSettings.subtle(c));
+            row.setInt(R.id.widget_row,"setBackgroundResource",ThemeSettings.dark(c)?R.drawable.widget_row_background_dark:R.drawable.widget_row_background);
+            row.setTextColor(R.id.widget_check,ThemeSettings.dark(c)?0xFFB6C8FF:0xFF4970DF);
             row.setTextViewText(R.id.widget_task_title,task.title);
             String detail=task.folder.isEmpty()?"Без папки":task.folder;
             if(task.dueAt!=null)detail=Instant.ofEpochMilli(task.dueAt).atZone(ZoneId.systemDefault())

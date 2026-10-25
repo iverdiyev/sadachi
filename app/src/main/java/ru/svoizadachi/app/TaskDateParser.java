@@ -57,20 +57,37 @@ public final class TaskDateParser {
         return new MatchResult((input.substring(0,m.start()) + " " + input.substring(m.end())).trim(),m);
     }
     public static Result parse(String input) { return parse(input, ZonedDateTime.now()); }
+    private static long number(String amount){
+        if(amount==null)return 1;
+        String value=amount.toLowerCase(new Locale("ru"));
+        switch(value){
+            case "один":case "одну":return 1;case "два":case "две":return 2;case "три":return 3;
+            case "четыре":return 4;case "пять":return 5;case "шесть":return 6;case "семь":return 7;
+            case "восемь":return 8;case "девять":return 9;case "десять":return 10;
+            default:return Long.parseLong(value);
+        }
+    }
+    private static final String AMOUNT="(?:\\d{1,5}|одну|один|две|два|три|четыре|пять|шесть|семь|восемь|девять|десять)";
     public static Result parse(String input, ZonedDateTime now) {
         String work=input==null?"":input.trim();
         if(work.isEmpty()) return new Result("",null,false,NO_REPEAT);
         int repeat=NO_REPEAT;
         // Relative durations are instants, not calendar dates. Keep seconds and
         // use the supplied clock so a two-minute reminder is exactly two minutes.
-        MatchResult relative=extract(work,BEFORE_WORD+"через\\s+(?:(\\d{1,5}|одну|один|две|два)\\s+)?(минуту|минуты|минут|мин\\.?|часа|часов|час|секунду|секунды|секунд|сек\\.?)"+AFTER_WORD);
+        MatchResult half=extract(work,BEFORE_WORD+"через\\s+(полчаса|полтора\\s+часа)"+AFTER_WORD);
+        if(half!=null){
+            String title=half.remaining.replaceAll("\\s+"," ").trim();if(title.isEmpty())title="Напоминание";
+            return new Result(title,now.plusMinutes(half.match.group(1).equalsIgnoreCase("полчаса")?30:90).toInstant().toEpochMilli(),true,NO_REPEAT);
+        }
+        MatchResult relative=extract(work,BEFORE_WORD+"через\\s+(?:("+AMOUNT+")\\s+)?(минуту|минуты|минут|мин\\.?|часа|часов|час|секунду|секунды|секунд|сек\\.?)"+AFTER_WORD
+                +"(?:\\s+(?:и\\s+)?("+AMOUNT+")\\s+(минуту|минуты|минут|мин\\.?|секунду|секунды|секунд|сек\\.?)"+AFTER_WORD+")?");
         if(relative!=null){
             String amount=relative.match.group(1);
-            long count=amount==null||amount.equalsIgnoreCase("одну")||amount.equalsIgnoreCase("один")?1:
-                    amount.equalsIgnoreCase("две")||amount.equalsIgnoreCase("два")?2:Long.parseLong(amount);
+            long count=number(amount);
             if(count>0){
                 String unit=relative.match.group(2).toLowerCase(Locale.ROOT);
                 long seconds=count*(unit.startsWith("час")?3600:unit.startsWith("мин")?60:1);
+                if(relative.match.group(3)!=null)seconds+=number(relative.match.group(3))*(relative.match.group(4).toLowerCase(Locale.ROOT).startsWith("мин")?60:1);
                 String title=relative.remaining.replaceAll("\\s+"," ").replaceAll("^[,.;: \\t]+|[,.;: \\t]+$","").trim();
                 if(title.isEmpty())title="Напоминание";
                 return new Result(title,now.plusSeconds(seconds).toInstant().toEpochMilli(),true,NO_REPEAT);
@@ -91,11 +108,11 @@ public final class TaskDateParser {
             work=m.remaining;
         }
         if(date==null){
-            m=extract(work,BEFORE_WORD+"через\\s+(\\d{1,3})\\s+(?:день|дня|дней|сутки|суток)"+AFTER_WORD);
-            if(m!=null){date=now.toLocalDate().plusDays(Integer.parseInt(m.match.group(1)));work=m.remaining;}
+            m=extract(work,BEFORE_WORD+"через\\s+(?:("+AMOUNT+")\\s+)?(день|дня|дней|сутки|суток|неделю|недели|недель)"+AFTER_WORD);
+            if(m!=null&&number(m.match.group(1))>0){date=now.toLocalDate().plusDays(number(m.match.group(1))*(m.match.group(2).toLowerCase(Locale.ROOT).startsWith("недел")?7:1));work=m.remaining;}
         }
         if(date==null){
-            m=extract(work,"(?<!\\d)(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?(?!\\d)");
+            m=extract(work,"(?<![\\d:])(?<![вВ] )(?<![вВ]  )(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?(?![\\d:])");
             if(m!=null){
                 try {
                     int day=Integer.parseInt(m.match.group(1));int month=Integer.parseInt(m.match.group(2));
@@ -108,18 +125,18 @@ public final class TaskDateParser {
             }
         }
         if(date==null){
-            m=extract(work,BEFORE_WORD+"(\\d{1,2})\\s+(января|январь|янв|февраля|февраль|фев|марта|март|мар|апреля|апрель|апр|мая|май|июня|июнь|июля|июль|августа|август|авг|сентября|сентябрь|сент|сен|октября|октябрь|окт|ноября|ноябрь|ноя|декабря|декабрь|дек)"+AFTER_WORD);
+            m=extract(work,BEFORE_WORD+"(\\d{1,2})\\s+(января|январь|янв|февраля|февраль|фев|марта|март|мар|апреля|апрель|апр|мая|май|июня|июнь|июля|июль|августа|август|авг|сентября|сентябрь|сент|сен|октября|октябрь|окт|ноября|ноябрь|ноя|декабря|декабрь|дек)"+AFTER_WORD+"(?:\\s+(20\\d{2})"+AFTER_WORD+")?");
             if(m!=null){
                 try{
                     int day=Integer.parseInt(m.match.group(1));int month=MONTHS.get(m.match.group(2).toLowerCase(new Locale("ru")));
-                    LocalDate test=LocalDate.of(now.getYear(),month,day);
-                    if(test.isBefore(now.toLocalDate()))test=test.plusYears(1);
+                    LocalDate test=LocalDate.of(m.match.group(3)==null?now.getYear():Integer.parseInt(m.match.group(3)),month,day);
+                    if(m.match.group(3)==null&&test.isBefore(now.toLocalDate()))test=test.plusYears(1);
                     date=test;work=m.remaining;
                 }catch(Exception ignored){}
             }
         }
         if(date==null){
-            m=extract(work,BEFORE_WORD+"(?:в|во|на)\\s+(понедельник|понедельника|вторник|вторника|среду|среда|четверг|четверга|пятницу|пятница|субботу|суббота|воскресенье)"+AFTER_WORD);
+            m=extract(work,BEFORE_WORD+"(?:(?:в|во|на)\\s+)?(понедельник|понедельника|вторник|вторника|среду|среда|четверг|четверга|пятницу|пятница|субботу|суббота|воскресенье)"+AFTER_WORD);
             if(m!=null){
                 DayOfWeek day=DAYS.get(m.match.group(1).toLowerCase(new Locale("ru")));
                 date=now.toLocalDate().with(TemporalAdjusters.nextOrSame(day));

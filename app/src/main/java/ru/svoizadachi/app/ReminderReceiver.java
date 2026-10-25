@@ -26,7 +26,7 @@ public final class ReminderReceiver extends BroadcastReceiver {
         boolean snoozed=due!=(task.dueAt==null?0:task.dueAt);
         ReminderScheduler.record(c,"Таймер сработал");
         if(post(c,task)){
-            ReminderScheduler.delivered(c,task,due);
+            ReminderScheduler.delivered(c,task,due,intent.getBooleanExtra("recovered",false));
             if(!snoozed)ReminderScheduler.advanceRepeating(c,task);
             else ReminderScheduler.schedule(c,task);
         }
