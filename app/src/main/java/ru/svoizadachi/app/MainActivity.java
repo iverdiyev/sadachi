@@ -53,6 +53,20 @@ public final class MainActivity extends Activity {
     private EditText entry;
     private TaskStore store;
     private boolean askedExact;
+    private String selectedFolder;
+    private Long draftDue;
+    private boolean draftHasTime;
+    private TextView folderLabel,dateChip;
+    private TextSwitcher hints;
+    private int hintIndex;
+    private final Set<Long> expanded=new HashSet<>();
+    private static final String[] HINTS={"Что нужно сделать сегодня?", "Напиши, что сделать через час", "Например: чай через 2 минуты", "Разбей большую задачу на маленькие шаги"};
+    private final Runnable hintTick=new Runnable(){
+        @Override public void run(){
+            if(hints!=null&&entry.length()==0&&!entry.hasFocus()&&motion())hints.setText(HINTS[(++hintIndex)%HINTS.length]);
+            handler.postDelayed(this,4500);
+        }
+    };
     private final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable previewUpdate=()->updatePreview();
     private final Runnable clockTick=new Runnable(){
@@ -74,21 +88,36 @@ public final class MainActivity extends Activity {
                 |View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         store=new TaskStore(this);
         ReminderScheduler.createChannel(this);
-        if(state!=null)filter=state.getInt("filter",0);
+        if(state!=null){
+            filter=state.getInt("filter",0);selectedFolder=state.getString("folder");
+            if(state.containsKey("draft_due")){draftDue=state.getLong("draft_due");draftHasTime=state.getBoolean("draft_time");}
+        }
         buildInterface();
         if(state!=null){entry.setText(state.getString("draft",""));entry.setSelection(entry.length());}
+        openWidgetIntent(getIntent());
     }
     @Override protected void onResume(){
         super.onResume();
         ReminderScheduler.scheduleAll(this);
         if(cards!=null)refresh(false);
         handler.removeCallbacks(clockTick);handler.postDelayed(clockTick,60000);
+        handler.removeCallbacks(hintTick);if(motion())handler.postDelayed(hintTick,4500);
     }
-    @Override protected void onPause(){super.onPause();handler.removeCallbacks(clockTick);}
+    @Override protected void onPause(){super.onPause();handler.removeCallbacks(clockTick);handler.removeCallbacks(hintTick);}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy();}
     @Override protected void onSaveInstanceState(Bundle state){
         state.putInt("filter",filter);state.putString("draft",entry.getText().toString());
+        state.putString("folder",selectedFolder);
+        if(draftDue!=null){state.putLong("draft_due",draftDue);state.putBoolean("draft_time",draftHasTime);}
         super.onSaveInstanceState(state);
+    }
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);openWidgetIntent(intent);}
+    private void openWidgetIntent(Intent intent){
+        if(intent==null)return;
+        long id=intent.getLongExtra("open_task",-1);boolean add=intent.getBooleanExtra("new_task",false);
+        intent.removeExtra("open_task");intent.removeExtra("new_task");
+        if(add)handler.post(()->{entry.requestFocus();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(entry,InputMethodManager.SHOW_IMPLICIT);});
+        else if(id>=0)handler.post(()->{Task task=store.find(id);if(task!=null)editTask(task);});
     }
     private int dp(float value){return (int)(getResources().getDisplayMetrics().density*value+.5f);}
     private LinearLayout.LayoutParams lp(int width,int height){
@@ -166,7 +195,11 @@ public final class MainActivity extends Activity {
         TextView settings=label("⋯",26,PURPLE,true);settings.setGravity(Gravity.CENTER);
         settings.setContentDescription("Настройки напоминаний");touchBackground(settings,Color.WHITE,18);
         heading.addView(settings,lp(48,48));settings.setOnClickListener(v->showReminderSettings());
-        page.addView(heading,lp(-1,-2));gap(page,20);
+        page.addView(heading,lp(-1,-2));
+        folderLabel=label("Все заметки  ▾",14,PURPLE,true);folderLabel.setPadding(dp(10),dp(12),dp(10),dp(12));
+        folderLabel.setMinHeight(dp(48));touchBackground(folderLabel,Color.WHITE,14);
+        folderLabel.setOnClickListener(v->showFolders());folderLabel.setOnLongClickListener(v->{manageFolders();return true;});
+        LinearLayout.LayoutParams foldersLp=lp(-1,-2);foldersLp.topMargin=dp(10);page.addView(folderLabel,foldersLp);gap(page,16);
 
         LinearLayout hero=column();hero.setPadding(dp(18),dp(16),dp(18),dp(16));
         GradientDrawable gradient=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -189,13 +222,25 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
         LinearLayout composer=column();composer.setPadding(dp(16),dp(10),dp(16),dp(12));
         composer.setBackground(border(Color.WHITE,22));
+        hints=new TextSwitcher(this);hints.setFactory(()->label("",12,SUBTLE,false));hints.setCurrentText(HINTS[0]);
+        android.view.animation.AnimationSet hintIn=new android.view.animation.AnimationSet(true);
+        hintIn.addAnimation(new android.view.animation.AlphaAnimation(0,1));hintIn.addAnimation(new android.view.animation.TranslateAnimation(0,0,dp(5),0));hintIn.setDuration(220);
+        android.view.animation.AnimationSet hintOut=new android.view.animation.AnimationSet(true);
+        hintOut.addAnimation(new android.view.animation.AlphaAnimation(1,0));hintOut.addAnimation(new android.view.animation.TranslateAnimation(0,0,0,-dp(5)));hintOut.setDuration(160);
+        if(motion()){hints.setInAnimation(hintIn);hints.setOutAnimation(hintOut);}composer.addView(hints,lp(-1,-2));
         entry=new EditText(this);entry.setId(View.generateViewId());entry.setTextSize(16);entry.setTextColor(TEXT);
-        entry.setHintTextColor(SUBTLE);entry.setHint("Например, чай через 2 минуты");
+        entry.setHintTextColor(SUBTLE);entry.setHint("Название задачи или заметки");
         entry.setContentDescription("Название задачи и время напоминания");
         entry.setBackgroundColor(Color.TRANSPARENT);entry.setPadding(0,dp(8),0,dp(8));
         entry.setMinLines(1);entry.setMaxLines(5);entry.setGravity(Gravity.TOP|Gravity.START);
         entry.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         entry.setImeOptions(EditorInfo.IME_ACTION_DONE);composer.addView(entry,lp(-1,-2));
+        dateChip=label(DateTimePicker.format(draftDue,draftHasTime),12,PURPLE,true);dateChip.setPadding(dp(10),dp(12),dp(10),dp(12));
+        dateChip.setMinHeight(dp(48));touchBackground(dateChip,BACKGROUND,12);
+        dateChip.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Дата задачи")
+                .setItems(new String[]{"Выбрать дату и время","Убрать выбранную дату"},(dialog,index)->{
+                    if(index==0)DateTimePicker.show(this,draftDue,(due,time)->setDraftDate(due,time));else setDraftDate(null,false);
+                }).show());composer.addView(dateChip,lp(-1,-2));
         preview=label("Дату и время можно написать словами",12,SUBTLE,false);
         preview.setVisibility(View.GONE);
         preview.setPadding(dp(12),dp(10),dp(12),dp(10));preview.setBackground(bg(BACKGROUND,12));
@@ -230,6 +275,7 @@ public final class MainActivity extends Activity {
         entry.addTextChangedListener(new TextWatcher(){
             @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
             @Override public void onTextChanged(CharSequence s,int start,int before,int count){
+                hints.setVisibility(s.length()==0?View.VISIBLE:View.GONE);
                 handler.removeCallbacks(previewUpdate);handler.postDelayed(previewUpdate,100);
             }
             @Override public void afterTextChanged(Editable e){}
@@ -253,8 +299,8 @@ public final class MainActivity extends Activity {
         root.requestFocus();refresh(false);enter(hero,0);enter(composer,60);
     }
     private void updatePreview(){
-        String raw=entry.getText().toString();TaskDateParser.Result parsed=TaskDateParser.parse(raw);
-        if(raw.trim().isEmpty()){
+        String raw=entry.getText().toString();TaskDateParser.Result parsed=parsedEntry();
+        if(raw.trim().isEmpty()&&draftDue==null){
             preview.setVisibility(View.GONE);
             preview.setText("Дату и время можно написать словами");preview.setTextColor(SUBTLE);return;
         }
@@ -267,12 +313,21 @@ public final class MainActivity extends Activity {
         if(!parsed.hasTime)text+=" · без уведомления";
         preview.setText(text);preview.setTextColor(PURPLE);
     }
+    private TaskDateParser.Result parsedEntry(){
+        TaskDateParser.Result parsed=TaskDateParser.parse(entry.getText().toString());
+        return draftDue==null?parsed:new TaskDateParser.Result(parsed.title,draftDue,draftHasTime,parsed.repeat);
+    }
+    private void setDraftDate(Long due,boolean time){
+        draftDue=due;draftHasTime=time;dateChip.setText(DateTimePicker.format(due,time));updatePreview();
+    }
     private void createTask(){
         String raw=entry.getText().toString().trim();
         if(raw.isEmpty()){entry.setError("Напиши, что нужно сделать");entry.requestFocus();return;}
-        TaskDateParser.Result parsed=TaskDateParser.parse(raw);
+        TaskDateParser.Result parsed=parsedEntry();
         Task task=new Task(store.allocateId(),parsed.title,parsed.dueAt,parsed.hasTime,parsed.repeat,false);
+        task.folder=selectedFolder==null?"":selectedFolder;
         store.upsert(task);ReminderScheduler.schedule(this,task);
+        draftDue=null;draftHasTime=false;dateChip.setText("Выбрать дату");
         handler.removeCallbacks(previewUpdate);entry.setText("");updatePreview();filter=0;
         ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(entry.getWindowToken(),0);
         root.requestFocus();refresh(true);
@@ -362,6 +417,9 @@ public final class MainActivity extends Activity {
     private void refresh(boolean animate){
         if(cards==null)return;
         List<Task> tasks=store.all();
+        if(selectedFolder!=null&&!selectedFolder.isEmpty()&&!store.folders().contains(selectedFolder))selectedFolder=null;
+        folderLabel.setText((selectedFolder==null?"Все заметки":selectedFolder.isEmpty()?"Без папки":selectedFolder)+"  ▾");
+        if(selectedFolder!=null)tasks.removeIf(task->!task.folder.equals(selectedFolder));
         tasks.sort((a,b)->{
             if(a.done!=b.done)return a.done?1:-1;
             if(a.dueAt==null&&b.dueAt==null)return Long.compare(b.id,a.id);
@@ -410,8 +468,29 @@ public final class MainActivity extends Activity {
         text.addView(title,lp(-1,-2));gap(text,7);
         boolean overdue=!task.done&&task.dueAt!=null&&task.hasTime&&task.dueAt<System.currentTimeMillis();
         TextView date=label(taskDate(task),12,overdue?Color.rgb(177,63,76):task.hasTime?PURPLE:SUBTLE,false);
-        text.addView(date,lp(-1,-2));text.setOnClickListener(v->taskOptions(task));
-        text.setFocusable(true);text.setContentDescription(task.title+". "+taskDate(task)+". Изменить задачу");
+        text.addView(date,lp(-1,-2));
+        TextView summary=label((task.folder.isEmpty()?"":task.folder+" · ")+(task.items.isEmpty()?"Раскрыть заметку ▾":task.completedItems()+"/"+task.items.size()+" пунктов ▾"),12,SUBTLE,false);
+        LinearLayout.LayoutParams summaryLp=lp(-1,-2);summaryLp.topMargin=dp(7);text.addView(summary,summaryLp);
+        LinearLayout details=column();details.setVisibility(expanded.contains(task.id)?View.VISIBLE:View.GONE);text.addView(details,lp(-1,-2));
+        gap(details,12);
+        TextView description=label(task.description.isEmpty()?"Добавь описание или чек-лист через «Редактировать»":task.description,14,SUBTLE,false);
+        description.setTextIsSelectable(true);details.addView(description,lp(-1,-2));
+        for(Task.Item item:task.items){
+            CheckBox bullet=new CheckBox(this);bullet.setText(item.text);bullet.setTextSize(14);bullet.setTextColor(TEXT);bullet.setMinHeight(dp(48));
+            bullet.setButtonTintList(ColorStateList.valueOf(PURPLE));bullet.setChecked(item.done);
+            bullet.setOnCheckedChangeListener((v,checked)->{
+                item.done=checked;store.upsert(task);summary.setText(task.completedItems()+"/"+task.items.size()+" пунктов ▾");
+                if(motion())bullet.animate().alpha(.65f).setDuration(80).withEndAction(()->bullet.animate().alpha(1).setDuration(140).start()).start();
+            });details.addView(bullet,lp(-1,-2));
+        }
+        TextView edit=label("Редактировать заметку",13,PURPLE,true);edit.setMinHeight(dp(48));touchBackground(edit,BACKGROUND,12);
+        details.addView(edit,lp(-1,-2));edit.setOnClickListener(v->editTask(task));
+        text.setOnClickListener(v->{
+            boolean open=details.getVisibility()!=View.VISIBLE;
+            if(motion())android.transition.TransitionManager.beginDelayedTransition(cards,new android.transition.AutoTransition().setDuration(180));
+            if(open)expanded.add(task.id);else expanded.remove(task.id);details.setVisibility(open?View.VISIBLE:View.GONE);
+        });
+        text.setFocusable(true);text.setContentDescription(task.title+". "+taskDate(task)+". Раскрыть описание и чек-лист");
         TextView more=label("⋮",24,SUBTLE,false);more.setGravity(Gravity.CENTER);
         more.setContentDescription("Действия с задачей: "+task.title);touchBackground(more,Color.WHITE,14);
         row.addView(more,lp(48,48));more.setOnClickListener(v->taskOptions(task));
@@ -424,7 +503,12 @@ public final class MainActivity extends Activity {
         row.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
         task.done=checked;store.upsert(task);
         if(checked)ReminderScheduler.cancel(this,task.id);else ReminderScheduler.schedule(this,task);
-        undoAction=()->{task.done=previous;store.upsert(task);if(previous)ReminderScheduler.cancel(this,task.id);else ReminderScheduler.schedule(this,task);refresh(false);};
+        undoAction=()->{
+            Task current=store.find(task.id);if(current==null)return;
+            current.done=previous;store.upsert(current);
+            if(previous)ReminderScheduler.cancel(this,current.id);else ReminderScheduler.schedule(this,current);
+            refresh(false);
+        };
         undoMessage.setText(checked?"Задача выполнена":"Задача возвращена");undoBar.setVisibility(View.VISIBLE);enter(undoBar,0);
         handler.removeCallbacks(hideUndo);handler.postDelayed(hideUndo,5000);
         if(!motion()){refresh(false);return;}
@@ -465,21 +549,41 @@ public final class MainActivity extends Activity {
         }).show();
     }
     private void editTask(Task task){
-        LinearLayout layout=column();layout.setPadding(dp(24),dp(12),dp(24),dp(8));
-        EditText edit=new EditText(this);edit.setText(task.title);edit.setTextSize(16);edit.setMinLines(2);edit.setMaxLines(5);
-        edit.setTextColor(TEXT);edit.setSelectAllOnFocus(true);layout.addView(edit,lp(-1,-2));
-        CheckBox removeDate=new CheckBox(this);removeDate.setText("Убрать дату и напоминание");removeDate.setTextColor(SUBTLE);
-        removeDate.setVisibility(task.dueAt==null?View.GONE:View.VISIBLE);layout.addView(removeDate,lp(-1,-2));
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Изменить задачу")
-                .setMessage("Новое время можно написать словами, например «через 2 минуты». Без новой даты прежнее время сохранится.")
-                .setView(layout).setNegativeButton("Отмена",null).setPositiveButton("Сохранить",null).create();
+        TaskEditor.show(this,task,()->{expanded.add(task.id);refresh(true);Task updated=store.find(task.id);if(updated!=null&&updated.hasTime&&!updated.done)ensureReminderAccess();});
+    }
+    private void showFolders(){
+        List<String> folders=store.folders();List<String> options=new ArrayList<>();
+        options.add("Все заметки");options.add("Без папки");options.addAll(folders);options.add("＋ Создать папку");options.add("Управление папками");
+        new AlertDialog.Builder(this).setTitle("Папки").setItems(options.toArray(new String[0]),(d,index)->{
+            if(index==folders.size()+2)folderName(null);
+            else if(index==folders.size()+3)manageFolders();
+            else {selectedFolder=index==0?null:index==1?"":folders.get(index-2);filter=0;refresh(true);}
+        }).show();
+    }
+    private void folderName(String old){
+        EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Например: Учёба");if(old!=null)name.setText(old);
+        LinearLayout content=column();content.setPadding(dp(24),dp(8),dp(24),0);content.addView(name,lp(-1,-2));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(old==null?"Новая папка":"Название папки").setView(content)
+                .setNegativeButton("Отмена",null).setPositiveButton("Сохранить",null).create();
         dialog.setOnShowListener(ignored->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            String raw=edit.getText().toString().trim();if(raw.isEmpty()){edit.setError("Название не должно быть пустым");return;}
-            TaskDateParser.Result parsed=TaskDateParser.parse(raw);task.title=parsed.title;
-            if(removeDate.isChecked()){task.dueAt=null;task.hasTime=false;task.repeat=0;}
-            else if(parsed.dueAt!=null){task.dueAt=parsed.dueAt;task.hasTime=parsed.hasTime;task.repeat=parsed.repeat;}
-            ReminderScheduler.cancel(this,task.id);store.upsert(task);ReminderScheduler.schedule(this,task);
-            refresh(true);dialog.dismiss();if(task.hasTime&&!task.done)ensureReminderAccess();
+            String value=name.getText().toString().trim();
+            boolean success=old==null?store.addFolder(value):store.renameFolder(old,value);
+            if(!success){name.setError("Введи непустое уникальное название");return;}
+            selectedFolder=value;filter=0;refresh(true);dialog.dismiss();
         }));dialog.show();
+    }
+    private void manageFolders(){
+        List<String> folders=store.folders();if(folders.isEmpty()){folderName(null);return;}
+        new AlertDialog.Builder(this).setTitle("Управление папками").setItems(folders.toArray(new String[0]),(d,index)->{
+            String folder=folders.get(index);new AlertDialog.Builder(this).setTitle(folder)
+                    .setItems(new String[]{"Переименовать","Удалить папку"},(a,operation)->{
+                        if(operation==0)folderName(folder);
+                        else new AlertDialog.Builder(this).setTitle("Удалить папку?")
+                                .setMessage("Заметки не удалятся и останутся в разделе «Без папки».")
+                                .setNegativeButton("Отмена",null).setPositiveButton("Удалить",(b,c)->{
+                                    store.removeFolder(folder);if(folder.equals(selectedFolder))selectedFolder="";refresh(true);
+                                }).show();
+                    }).show();
+        }).show();
     }
 }
