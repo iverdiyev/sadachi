@@ -28,6 +28,13 @@ jobs:
           java -cp parser-tests ParserTest
       - name: Тесты и сборка APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - name: Отчёты тестов
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Sadachi-APK

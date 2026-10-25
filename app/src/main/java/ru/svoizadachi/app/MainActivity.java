@@ -18,9 +18,12 @@ import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
@@ -31,7 +34,7 @@ import java.util.*;
 /** Native, offline UI. No WebView, network or heavyweight animation framework. */
 public final class MainActivity extends Activity {
     private static final int BACKGROUND=Color.rgb(246,247,252);
-    private static final int PURPLE=Color.rgb(103,83,222);
+    private static final int PURPLE=Color.rgb(73,112,223);
     private static final int TEXT=Color.rgb(33,35,57);
     private static final int SUBTLE=Color.rgb(105,110,133);
     private static final int PALE=Color.rgb(237,233,255);
@@ -40,7 +43,10 @@ public final class MainActivity extends Activity {
     private static final Locale RU=new Locale("ru");
     private static final String[] FILTER_NAMES={"Все","Сегодня","Потом","Готово"};
     private int filter;
-    private LinearLayout root,cards,chipRow,permissionCard;
+    private LinearLayout root,cards,chipRow,permissionCard,undoBar;
+    private TextView undoMessage;
+    private Runnable undoAction;
+    private final Runnable hideUndo=()->{if(undoBar!=null)undoBar.setVisibility(View.GONE);undoAction=null;};
     private ScrollView scroll;
     private TextView preview,countLabel,heroTitle,heroDetail,permissionText;
     private ProgressBar progress;
@@ -97,6 +103,15 @@ public final class MainActivity extends Activity {
     private void touchBackground(View view,int color,int radius){
         view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x226753DE),bg(color,radius),bg(Color.WHITE,radius)));
         view.setClickable(true);view.setFocusable(true);
+        view.setOnTouchListener((v,event)->{
+            if(motion()){
+                boolean down=event.getActionMasked()==MotionEvent.ACTION_DOWN;
+                if(down||event.getActionMasked()==MotionEvent.ACTION_UP||event.getActionMasked()==MotionEvent.ACTION_CANCEL)
+                    v.animate().scaleX(down?.97f:1).scaleY(down?.97f:1).setDuration(down?90:240)
+                            .setInterpolator(new OvershootInterpolator(.8f)).start();
+            }
+            return false;
+        });
     }
     private TextView label(String text,int size,int color,boolean bold){
         TextView view=new TextView(this);view.setText(text);view.setTextSize(size);view.setTextColor(color);
@@ -139,36 +154,41 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
         scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);
         scroll.setVerticalScrollBarEnabled(false);scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        root.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout page=column();page.setPadding(dp(24),dp(18),dp(24),dp(28));
         scroll.addView(page,new ScrollView.LayoutParams(-1,-2));
 
         TextView date=label(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM",RU)),13,SUBTLE,false);
         page.addView(date,lp(-1,-2));gap(page,8);
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=label("Свои задачи",30,TEXT,true);
+        TextView title=label("Входящие",30,TEXT,true);
         heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         TextView settings=label("⋯",26,PURPLE,true);settings.setGravity(Gravity.CENTER);
         settings.setContentDescription("Настройки напоминаний");touchBackground(settings,Color.WHITE,18);
         heading.addView(settings,lp(48,48));settings.setOnClickListener(v->showReminderSettings());
         page.addView(heading,lp(-1,-2));gap(page,20);
 
-        LinearLayout hero=column();hero.setPadding(dp(22),dp(22),dp(22),dp(22));
+        LinearLayout hero=column();hero.setPadding(dp(18),dp(16),dp(18),dp(16));
         GradientDrawable gradient=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(112,90,229),Color.rgb(81,73,179)});
-        gradient.setCornerRadius(dp(28));hero.setBackground(gradient);
-        hero.addView(label("В СВОЁМ РИТМЕ",11,0xFFE2DDFF,true),lp(-1,-2));gap(hero,12);
-        heroTitle=label("Место для важного",23,Color.WHITE,true);hero.addView(heroTitle,lp(-1,-2));gap(hero,8);
-        heroDetail=label("Один маленький шаг — уже прогресс",13,0xFFE7E2FF,false);
-        hero.addView(heroDetail,lp(-1,-2));gap(hero,18);
+                new int[]{Color.rgb(79,123,230),Color.rgb(66,96,199)});
+        gradient.setCornerRadius(dp(22));hero.setBackground(gradient);
+        heroTitle=label("Мой день",18,Color.WHITE,true);hero.addView(heroTitle,lp(-1,-2));gap(hero,6);
+        heroDetail=label("",12,0xFFE7EEFF,false);
+        hero.addView(heroDetail,lp(-1,-2));gap(hero,12);
         progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);progress.setProgressTintList(ColorStateList.valueOf(Color.WHITE));
         progress.setProgressBackgroundTintList(ColorStateList.valueOf(0x44FFFFFF));
         hero.addView(progress,lp(-1,5));page.addView(hero,lp(-1,-2));gap(page,18);
 
-        LinearLayout composer=column();composer.setPadding(dp(18),dp(18),dp(18),dp(18));
-        composer.setBackground(border(Color.WHITE,24));
-        composer.addView(label("Что хочется сделать?",16,TEXT,true),lp(-1,-2));gap(composer,10);
+        undoBar=new LinearLayout(this);undoBar.setGravity(Gravity.CENTER_VERTICAL);undoBar.setPadding(dp(16),dp(4),dp(8),dp(4));
+        undoBar.setBackground(bg(TEXT,16));undoBar.setVisibility(View.GONE);
+        undoMessage=label("Задача выполнена",13,Color.WHITE,false);
+        undoBar.addView(undoMessage,new LinearLayout.LayoutParams(0,-2,1));
+        TextView undo=label("Отменить",13,0xFFB8CEFF,true);undo.setGravity(Gravity.CENTER);touchBackground(undo,TEXT,12);
+        undoBar.addView(undo,lp(96,48));undo.setOnClickListener(v->{if(undoAction!=null)undoAction.run();handler.removeCallbacks(hideUndo);hideUndo.run();});
+        LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
+        LinearLayout composer=column();composer.setPadding(dp(16),dp(10),dp(16),dp(12));
+        composer.setBackground(border(Color.WHITE,22));
         entry=new EditText(this);entry.setId(View.generateViewId());entry.setTextSize(16);entry.setTextColor(TEXT);
         entry.setHintTextColor(SUBTLE);entry.setHint("Например, чай через 2 минуты");
         entry.setContentDescription("Название задачи и время напоминания");
@@ -214,7 +234,8 @@ public final class MainActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable e){}
         });
-        page.addView(composer,lp(-1,-2));gap(page,16);
+        LinearLayout.LayoutParams composerLp=lp(-1,-2);composerLp.setMargins(dp(20),dp(4),dp(20),dp(10));
+        root.addView(composer,composerLp);
 
         permissionCard=column();permissionCard.setPadding(dp(16),dp(14),dp(16),dp(14));
         touchBackground(permissionCard,Color.rgb(255,245,225),18);
@@ -259,9 +280,7 @@ public final class MainActivity extends Activity {
         if(task.dueAt!=null&&task.hasTime)ensureReminderAccess();
     }
     private boolean notificationsEnabled(){
-        return ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).areNotificationsEnabled()
-                && ((NotificationManager)getSystemService(NOTIFICATION_SERVICE))
-                .getNotificationChannel(ReminderScheduler.CHANNEL).getImportance()!=NotificationManager.IMPORTANCE_NONE;
+        return ReminderScheduler.notificationsEnabled(this);
     }
     private void ensureReminderAccess(){
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
@@ -271,7 +290,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
         super.onRequestPermissionsResult(request,permissions,results);
-        if(request==17){refresh(false);if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)maybeAskExact();}
+        if(request==17){ReminderScheduler.scheduleAll(this);refresh(false);if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)maybeAskExact();}
     }
     private void maybeAskExact(){
         if(Build.VERSION.SDK_INT>=31&&!ReminderScheduler.hasExactAccess(this)&&!askedExact){
@@ -293,14 +312,33 @@ public final class MainActivity extends Activity {
     private void showReminderSettings(){
         String[] options={"Уведомления: "+(notificationsEnabled()?"включены":"выключены"),
                 "Точное время: "+(ReminderScheduler.hasExactAccess(this)?"разрешено":"нужно разрешить"),
-                "Фоновая работа на OnePlus"};
+                "Фоновая работа на OnePlus", "Проверить уведомление сейчас", "Таймер на 10 секунд", "Диагностика"};
         new AlertDialog.Builder(this).setTitle("Настройки напоминаний").setItems(options,(d,which)->{
-            if(which==0)startActivity(new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()).putExtra(Settings.EXTRA_CHANNEL_ID,ReminderScheduler.CHANNEL));
+            if(which==0){
+                if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED
+                        &&shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))ensureReminderAccess();
+                else startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));
+            }
             else if(which==1){if(Build.VERSION.SDK_INT>=31)openExactSettings();else Toast.makeText(this,"Точные напоминания доступны",Toast.LENGTH_SHORT).show();}
-            else new AlertDialog.Builder(this).setTitle("Напоминания на OnePlus")
+            else if(which==2)new AlertDialog.Builder(this).setTitle("Напоминания на OnePlus")
                     .setMessage("В настройках приложения открой «Использование батареи» и разреши фоновую работу, если уведомления задерживаются. Названия пунктов зависят от OxygenOS. Принудительная остановка приложения отключает напоминания до следующего открытия.")
                     .setNegativeButton("Понятно",null).setPositiveButton("Настройки приложения",(a,b)->openAppSettings()).show();
+            else if(which==3){
+                boolean posted=ReminderReceiver.post(this,null);
+                ReminderScheduler.record(this,posted?"Тест передан Android":"Тест заблокирован настройками уведомлений");
+                new AlertDialog.Builder(this).setTitle(posted?"Проверь шторку уведомлений":"Уведомления выключены")
+                        .setMessage(posted?"Если уведомление есть в шторке, но нет звука или баннера, проверь канал «Напоминания» и режим «Не беспокоить».":"Разреши уведомления в настройках приложения, затем повтори тест.")
+                        .setPositiveButton("Понятно",null).show();
+            }else if(which==4){
+                Task test=new Task(store.allocateId(),"Проверка напоминаний",System.currentTimeMillis()+10000,true,0,false);
+                store.upsert(test);ReminderScheduler.schedule(this,test);refresh(true);ensureReminderAccess();
+                Toast.makeText(this,ReminderScheduler.hasExactAccess(this)?"Заблокируй экран. Напоминание через 10 секунд":"Без доступа к точным таймерам Android может задержать тест",Toast.LENGTH_LONG).show();
+            }else new AlertDialog.Builder(this).setTitle("Диагностика напоминаний")
+                    .setMessage(ReminderScheduler.diagnostics(this)).setPositiveButton("Закрыть",null)
+                    .setNeutralButton("Скопировать",(a,b)->{
+                        ((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(
+                                android.content.ClipData.newPlainText("Диагностика",ReminderScheduler.diagnostics(this)));
+                    }).show();
         }).setNegativeButton("Закрыть",null).show();
     }
     private void renderChips(){
@@ -311,7 +349,14 @@ public final class MainActivity extends Activity {
             touchBackground(chip,i==filter?PURPLE:Color.WHITE,16);
             chip.setSelected(i==filter);chip.setContentDescription(FILTER_NAMES[i]+(i==filter?", выбрано":""));
             LinearLayout.LayoutParams p=lp(-2,-2);p.rightMargin=dp(6);chipRow.addView(chip,p);
-            chip.setOnClickListener(v->{if(filter!=index){filter=index;refresh(true);}});
+            chip.setOnClickListener(v->{if(filter!=index){
+                int direction=index>filter?1:-1;filter=index;
+                if(motion())cards.animate().alpha(0).translationX(dp(-12*direction)).setDuration(90).withEndAction(()->{
+                    refresh(false);cards.setTranslationX(dp(12*direction));cards.animate().alpha(1).translationX(0)
+                            .setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
+                }).start();
+                else refresh(false);
+            }});
         }
     }
     private void refresh(boolean animate){
@@ -324,9 +369,8 @@ public final class MainActivity extends Activity {
             int comparison=Long.compare(a.dueAt,b.dueAt);return comparison!=0?comparison:Long.compare(a.id,b.id);
         });
         long active=tasks.stream().filter(t->!t.done).count();long done=tasks.size()-active;
-        heroTitle.setText(active==0?(tasks.isEmpty()?"Место для важного":"Всё сделано. Выдохни."):"Всё получится");
-        heroDetail.setText(tasks.isEmpty()?"Начни с одной небольшой задачи":active==0?"Можно отдохнуть или задумать что-то новое":
-                "Выполнено "+done+" из "+tasks.size()+" · без спешки, по шагу");
+        heroTitle.setText(active==0?"Все задачи выполнены":"Осталось задач: "+active);
+        heroDetail.setText(tasks.isEmpty()?"Добавь первую задачу внизу": "Выполнено "+done+" из "+tasks.size()+" · смахни задачу, чтобы завершить");
         progress.setProgress(tasks.isEmpty()?0:(int)(100*done/tasks.size()),animate&&motion());
         countLabel.setText(filter==3?"Завершённые задачи":"Мои задачи · "+active);
         boolean notifications=notificationsEnabled(),exact=ReminderScheduler.hasExactAccess(this);
@@ -347,14 +391,14 @@ public final class MainActivity extends Activity {
             TextView icon=label(filter==3?"✓":"○",36,PURPLE,false);icon.setGravity(Gravity.CENTER);empty.addView(icon,lp(-1,50));gap(empty,12);
             TextView title=label(filter==3?"Пока без галочек":filter==1?"На сегодня всё спокойно":filter==2?"Будущее свободно":"Чистый лист",18,TEXT,true);
             title.setGravity(Gravity.CENTER);empty.addView(title,lp(-1,-2));gap(empty,8);
-            TextView detail=label(filter==3?"Завершённые задачи появятся здесь":"Добавь задачу выше. Например:\n«Выпить воду через 2 минуты»",13,SUBTLE,false);
+            TextView detail=label(filter==3?"Завершённые задачи появятся здесь":"Добавь задачу внизу. Например:\n«Выпить воду через 2 минуты»",13,SUBTLE,false);
             detail.setGravity(Gravity.CENTER);empty.addView(detail,lp(-1,-2));cards.addView(empty,lp(-1,-2));
             if(animate)enter(empty,0);
         }
     }
     private View createCard(Task task){
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(8),dp(14),dp(8),dp(14));row.setBackground(border(Color.WHITE,22));
+        SwipeTaskLayout row=new SwipeTaskLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(6),dp(10),dp(6),dp(10));row.setBackground(border(Color.WHITE,18));
         LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(10);cards.addView(row,p);
         CheckBox done=new CheckBox(this);done.setButtonTintList(ColorStateList.valueOf(task.done?GREEN:PURPLE));
         done.setContentDescription((task.done?"Вернуть задачу: ":"Завершить задачу: ")+task.title);
@@ -371,13 +415,29 @@ public final class MainActivity extends Activity {
         TextView more=label("⋮",24,SUBTLE,false);more.setGravity(Gravity.CENTER);
         more.setContentDescription("Действия с задачей: "+task.title);touchBackground(more,Color.WHITE,14);
         row.addView(more,lp(48,48));more.setOnClickListener(v->taskOptions(task));
-        done.setOnCheckedChangeListener((v,checked)->{
-            done.setEnabled(false);task.done=checked;store.upsert(task);
-            if(checked)ReminderScheduler.cancel(this,task.id);else ReminderScheduler.schedule(this,task);
-            if(motion())row.animate().alpha(0).translationX(dp(12)).setDuration(160).withEndAction(()->refresh(true)).start();
-            else refresh(false);
-        });
+        row.onComplete(()->completeTask(task,!task.done,row,title));
+        done.setOnCheckedChangeListener((v,checked)->{done.setEnabled(false);completeTask(task,checked,row,title);});
         return row;
+    }
+    private void completeTask(Task task,boolean checked,View row,TextView title){
+        boolean previous=task.done;if(checked==previous)return;
+        row.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+        task.done=checked;store.upsert(task);
+        if(checked)ReminderScheduler.cancel(this,task.id);else ReminderScheduler.schedule(this,task);
+        undoAction=()->{task.done=previous;store.upsert(task);if(previous)ReminderScheduler.cancel(this,task.id);else ReminderScheduler.schedule(this,task);refresh(false);};
+        undoMessage.setText(checked?"Задача выполнена":"Задача возвращена");undoBar.setVisibility(View.VISIBLE);enter(undoBar,0);
+        handler.removeCallbacks(hideUndo);handler.postDelayed(hideUndo,5000);
+        if(!motion()){refresh(false);return;}
+        if(checked)title.setPaintFlags(title.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+        row.animate().alpha(0).scaleX(.96f).scaleY(.96f).setDuration(160).withEndAction(()->{
+            int height=row.getHeight();if(height<=0){refresh(false);return;}
+            ValueAnimator collapse=ValueAnimator.ofInt(height,0);collapse.setDuration(180);
+            collapse.setInterpolator(new DecelerateInterpolator());
+            collapse.addUpdateListener(a->{row.getLayoutParams().height=(int)a.getAnimatedValue();row.requestLayout();});
+            collapse.addListener(new android.animation.AnimatorListenerAdapter(){
+                @Override public void onAnimationEnd(android.animation.Animator animator){refresh(false);}
+            });collapse.start();
+        }).start();
     }
     private String taskDate(Task task){
         if(task.dueAt==null)return "Без даты · в своём темпе";
@@ -391,8 +451,13 @@ public final class MainActivity extends Activity {
         return date;
     }
     private void taskOptions(Task task){
-        new AlertDialog.Builder(this).setTitle(task.title).setItems(new String[]{"Изменить","Удалить"},(dialog,which)->{
+        new AlertDialog.Builder(this).setTitle(task.title).setItems(new String[]{"Изменить","Через час","Завтра в 9:00","Удалить"},(dialog,which)->{
             if(which==0)editTask(task);
+            else if(which==1||which==2){
+                ReminderScheduler.cancel(this,task.id);task.done=false;task.hasTime=true;
+                task.dueAt=(which==1?ZonedDateTime.now().plusHours(1):LocalDate.now().plusDays(1).atTime(9,0).atZone(ZoneId.systemDefault())).toInstant().toEpochMilli();
+                store.upsert(task);ReminderScheduler.schedule(this,task);refresh(true);ensureReminderAccess();
+            }
             else new AlertDialog.Builder(this).setTitle("Удалить задачу?").setMessage(task.title)
                     .setNegativeButton("Отмена",null).setPositiveButton("Удалить",(d,w)->{
                         ReminderScheduler.cancel(this,task.id);store.remove(task.id);refresh(true);
