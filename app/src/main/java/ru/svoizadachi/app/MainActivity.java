@@ -19,9 +19,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowInsets;
-import android.view.accessibility.AccessibilityManager;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -175,13 +173,16 @@ public final class MainActivity extends Activity {
         entry.setHintTextColor(SUBTLE);entry.setHint("Например, чай через 2 минуты");
         entry.setContentDescription("Название задачи и время напоминания");
         entry.setBackgroundColor(Color.TRANSPARENT);entry.setPadding(0,dp(8),0,dp(8));
-        entry.setMinLines(2);entry.setMaxLines(5);entry.setGravity(Gravity.TOP|Gravity.START);
+        entry.setMinLines(1);entry.setMaxLines(5);entry.setGravity(Gravity.TOP|Gravity.START);
         entry.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         entry.setImeOptions(EditorInfo.IME_ACTION_DONE);composer.addView(entry,lp(-1,-2));
         preview=label("Дату и время можно написать словами",12,SUBTLE,false);
+        preview.setVisibility(View.GONE);
         preview.setPadding(dp(12),dp(10),dp(12),dp(10));preview.setBackground(bg(BACKGROUND,12));
         composer.addView(preview,lp(-1,-2));gap(composer,6);
         HorizontalScrollView suggestions=new HorizontalScrollView(this);suggestions.setHorizontalScrollBarEnabled(false);
+        suggestions.setVisibility(View.GONE);
+        entry.setOnFocusChangeListener((v,focused)->suggestions.setVisibility(focused?View.VISIBLE:View.GONE));
         LinearLayout shortcuts=new LinearLayout(this);
         String[] names={"Через 2 мин","Через час","Завтра"};
         String[] phrases={"через 2 минуты","через час","завтра в 9:00"};
@@ -233,8 +234,10 @@ public final class MainActivity extends Activity {
     private void updatePreview(){
         String raw=entry.getText().toString();TaskDateParser.Result parsed=TaskDateParser.parse(raw);
         if(raw.trim().isEmpty()){
+            preview.setVisibility(View.GONE);
             preview.setText("Дату и время можно написать словами");preview.setTextColor(SUBTLE);return;
         }
+        preview.setVisibility(View.VISIBLE);
         if(parsed.dueAt==null){preview.setText("Без напоминания · просто сохранить задачу");preview.setTextColor(SUBTLE);return;}
         LocalDateTime date=LocalDateTime.ofInstant(Instant.ofEpochMilli(parsed.dueAt),ZoneId.systemDefault());
         String text=(parsed.hasTime?"Напомню: ":"Дата: ")+date.format(DateTimeFormatter.ofPattern("d MMMM",RU));
@@ -327,7 +330,8 @@ public final class MainActivity extends Activity {
         progress.setProgress(tasks.isEmpty()?0:(int)(100*done/tasks.size()),animate&&motion());
         countLabel.setText(filter==3?"Завершённые задачи":"Мои задачи · "+active);
         boolean notifications=notificationsEnabled(),exact=ReminderScheduler.hasExactAccess(this);
-        permissionCard.setVisibility(notifications&&exact?View.GONE:View.VISIBLE);
+        boolean timedTasks=tasks.stream().anyMatch(t->!t.done&&t.hasTime&&t.dueAt!=null);
+        permissionCard.setVisibility(!timedTasks||notifications&&exact?View.GONE:View.VISIBLE);
         permissionText.setText(!notifications?"Уведомления выключены. Нажми, чтобы разрешить напоминания.":
                 "Для точного времени нужно разрешение Android. Нажми, чтобы настроить.");
         renderChips();cards.removeAllViews();int displayed=0;LocalDate today=LocalDate.now();
