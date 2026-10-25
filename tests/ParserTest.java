@@ -25,6 +25,24 @@ public class ParserTest {
         has("Вынести мусор каждую неделю в 19:00","Вынести мусор","2026-10-24T19:00",true,2,now);
         has("Оплатить связь в 13:00","Оплатить связь","2026-10-25T13:00",true,0,now);
         has("Просто задача","Просто задача",null,false,0,now);
-        System.out.println("OK: "+checked+" assertions");
+        // Simulate typing each character: the original app crashed on the first keystroke.
+        String[] typed = {
+            "Домашка завтра в 18:00",
+            "Позвонить маме послезавтра в 9 утра",
+            "Сдать зачёт 5 ноября в 14:00",
+            "Купить молоко сегодня в 20:15",
+            "Отправить письмо каждую неделю в 19:00",
+            "Проверить счёт 01.11 в 10.30",
+            "👋 Написать другу в пятницу в 8 вечера",
+            "просто русский текст без даты"
+        };
+        for (String phrase : typed) {
+            for (int len=0; len<=phrase.length(); len++) {
+                TaskDateParser.Result preview = TaskDateParser.parse(phrase.substring(0,len),now);
+                check(preview!=null && preview.title!=null,"crash for prefix of '"+phrase+"' length "+len);
+            }
+        }
+        check(TaskDateParser.parse(null,now).dueAt==null,"null should be safe");
+        System.out.println("OK: "+checked+" assertions (including typed prefixes)");
     }
 }

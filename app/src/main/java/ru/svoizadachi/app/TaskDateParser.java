@@ -11,6 +11,10 @@ public final class TaskDateParser {
     public static final int NO_REPEAT = 0;
     public static final int DAILY = 1;
     public static final int WEEKLY = 2;
+    // Explicit Unicode word boundaries work on both Android and desktop Java.
+    // They avoid the unsupported Android UNICODE_CHARACTER_CLASS flag.
+    private static final String BEFORE_WORD = "(?<![\\p{L}\\p{N}_])";
+    private static final String AFTER_WORD = "(?![\\p{L}\\p{N}_])";
     private static final Map<String,Integer> MONTHS = new HashMap<>();
     private static final Map<String,DayOfWeek> DAYS = new LinkedHashMap<>();
     static {
@@ -44,8 +48,11 @@ public final class TaskDateParser {
         final String remaining; final Matcher match;
         MatchResult(String remaining, Matcher match){ this.remaining=remaining;this.match=match; }
     }
+    // Android always uses Unicode character classes. Unlike desktop Java, it does
+    // NOT support Pattern.UNICODE_CHARACTER_CLASS or the inline (?U) modifier.
+    // Enabling either could crash the app as soon as the user types a character.
     private static MatchResult extract(String input,String pattern) {
-        Matcher m=Pattern.compile(pattern,Pattern.CASE_INSENSITIVE|Pattern.UNICODE_CASE|Pattern.UNICODE_CHARACTER_CLASS).matcher(input);
+        Matcher m=Pattern.compile(pattern,Pattern.CASE_INSENSITIVE|Pattern.UNICODE_CASE).matcher(input);
         if (!m.find()) return null;
         return new MatchResult((input.substring(0,m.start()) + " " + input.substring(m.end())).trim(),m);
     }
@@ -54,26 +61,26 @@ public final class TaskDateParser {
         String work=input==null?"":input.trim();
         if(work.isEmpty()) return new Result("",null,false,NO_REPEAT);
         int repeat=NO_REPEAT;
-        MatchResult rep=extract(work,"(?iuU)\\b(?:каждый\\s+день|ежедневно)\\b");
+        MatchResult rep=extract(work,BEFORE_WORD+"(?:каждый\\s+день|ежедневно)"+AFTER_WORD);
         if (rep!=null){repeat=DAILY;work=rep.remaining;}
         else {
-            rep=extract(work,"(?iuU)\\b(?:каждую\\s+неделю|еженедельно)\\b");
+            rep=extract(work,BEFORE_WORD+"(?:каждую\\s+неделю|еженедельно)"+AFTER_WORD);
             if(rep!=null){repeat=WEEKLY;work=rep.remaining;}
         }
         LocalDate date = null;
         MatchResult m;
-        m=extract(work,"(?iuU)\\b(послезавтра|завтра|сегодня)\\b");
+        m=extract(work,BEFORE_WORD+"(послезавтра|завтра|сегодня)"+AFTER_WORD);
         if(m!=null){
             String found=m.match.group(1).toLowerCase(new Locale("ru"));
             date=now.toLocalDate().plusDays(found.equals("послезавтра")?2:found.equals("завтра")?1:0);
             work=m.remaining;
         }
         if(date==null){
-            m=extract(work,"(?iuU)\\bчерез\\s+(\\d{1,3})\\s+(?:день|дня|дней|сутки|суток)\\b");
+            m=extract(work,BEFORE_WORD+"через\\s+(\\d{1,3})\\s+(?:день|дня|дней|сутки|суток)"+AFTER_WORD);
             if(m!=null){date=now.toLocalDate().plusDays(Integer.parseInt(m.match.group(1)));work=m.remaining;}
         }
         if(date==null){
-            m=extract(work,"(?iuU)(?<!\\d)(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?(?!\\d)");
+            m=extract(work,"(?<!\\d)(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?(?!\\d)");
             if(m!=null){
                 try {
                     int day=Integer.parseInt(m.match.group(1));int month=Integer.parseInt(m.match.group(2));
@@ -86,7 +93,7 @@ public final class TaskDateParser {
             }
         }
         if(date==null){
-            m=extract(work,"(?iuU)\\b(\\d{1,2})\\s+(января|январь|янв|февраля|февраль|фев|марта|март|мар|апреля|апрель|апр|мая|май|июня|июнь|июля|июль|августа|август|авг|сентября|сентябрь|сент|сен|октября|октябрь|окт|ноября|ноябрь|ноя|декабря|декабрь|дек)\\b");
+            m=extract(work,BEFORE_WORD+"(\\d{1,2})\\s+(января|январь|янв|февраля|февраль|фев|марта|март|мар|апреля|апрель|апр|мая|май|июня|июнь|июля|июль|августа|август|авг|сентября|сентябрь|сент|сен|октября|октябрь|окт|ноября|ноябрь|ноя|декабря|декабрь|дек)"+AFTER_WORD);
             if(m!=null){
                 try{
                     int day=Integer.parseInt(m.match.group(1));int month=MONTHS.get(m.match.group(2).toLowerCase(new Locale("ru")));
@@ -97,7 +104,7 @@ public final class TaskDateParser {
             }
         }
         if(date==null){
-            m=extract(work,"(?iuU)\\b(?:в|во|на)\\s+(понедельник|понедельника|вторник|вторника|среду|среда|четверг|четверга|пятницу|пятница|субботу|суббота|воскресенье)\\b");
+            m=extract(work,BEFORE_WORD+"(?:в|во|на)\\s+(понедельник|понедельника|вторник|вторника|среду|среда|четверг|четверга|пятницу|пятница|субботу|суббота|воскресенье)"+AFTER_WORD);
             if(m!=null){
                 DayOfWeek day=DAYS.get(m.match.group(1).toLowerCase(new Locale("ru")));
                 date=now.toLocalDate().with(TemporalAdjusters.nextOrSame(day));
@@ -105,13 +112,13 @@ public final class TaskDateParser {
             }
         }
         LocalTime time=null;
-        m=extract(work,"(?iuU)(?<!\\d)(?:\\bв\\s+)?([01]?\\d|2[0-3])[:.]([0-5]\\d)(?!\\d)");
+        m=extract(work,"(?<!\\d)(?:"+BEFORE_WORD+"в\\s+)?([01]?\\d|2[0-3])[:.]([0-5]\\d)(?!\\d)");
         if(m!=null){
             time=LocalTime.of(Integer.parseInt(m.match.group(1)),Integer.parseInt(m.match.group(2)));
             work=m.remaining;
         }
         if(time==null){
-            m=extract(work,"(?iuU)\\bв\\s+([01]?\\d|2[0-3])(?:\\s*час(?:а|ов)?)?\\s*(утра|дня|вечера|ночи)?\\b");
+            m=extract(work,BEFORE_WORD+"в\\s+([01]?\\d|2[0-3])(?:\\s*час(?:а|ов)?)?\\s*(утра|дня|вечера|ночи)?"+AFTER_WORD);
             if(m!=null){
                 int h=Integer.parseInt(m.match.group(1));
                 String part=m.match.group(2);
