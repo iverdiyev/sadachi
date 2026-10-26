@@ -15,7 +15,9 @@ repository = os.environ["GITHUB_REPOSITORY"]
 directory = Path("release-files")
 directory.mkdir(exist_ok=True)
 apk = directory / f"Sadachi-{code}.apk"
-shutil.copyfile("app/build/outputs/apk/debug/app-debug.apk", apk)
+shutil.copyfile(directory / "Sadachi-new.apk", apk)
+legacy = directory / f"Sadachi-legacy-{code}.apk"
+shutil.copyfile(directory / "Sadachi-legacy.apk", legacy)
 metadata = {
     "versionCode": code,
     "versionName": version,
@@ -23,17 +25,19 @@ metadata = {
     "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
 }
 manifest = directory / "update.json"
-manifest.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+new_manifest = directory / "update-com.ilkinsadachi.json"
+new_manifest.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+legacy_metadata = dict(metadata, apkUrl=f"https://github.com/{repository}/releases/download/{tag}/{legacy.name}", sha256=hashlib.sha256(legacy.read_bytes()).hexdigest())
+manifest.write_text(json.dumps(legacy_metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 exists = subprocess.run(["gh", "release", "view", tag], capture_output=True).returncode == 0
-assets = [str(apk), str(manifest)]
-assets.extend(str(path) for path in sorted(Path("docs/screenshots").glob("*.png")))
+assets = [str(apk), str(legacy), str(manifest), str(new_manifest)]
 if exists:
     subprocess.run(["gh", "release", "upload", tag, *assets, "--clobber"], check=True)
 else:
     subprocess.run([
         "gh", "release", "create", tag, *assets,
         "--target", os.environ["GITHUB_SHA"], "--latest",
-        "--title", f"Свои задачи {version}",
+        "--title", f"Sadachi {version}",
         "--notes", Path("CHANGELOG.md").read_text(encoding="utf-8").split("\n# ",1)[0]
-        + "\n\nИнструкции и скриншоты — в README. Тестовая сборка; установка подтверждается Android.",
+        + "\n\nОсновное приложение: com.ilkinsadachi. Файл legacy обновляет старое приложение для переноса данных. Инструкции — в README. Установка подтверждается Android.",
     ], check=True)

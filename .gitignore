@@ -10,3 +10,5 @@ parser-tests/
 *.keystore
 release-files/
 .signing/
+app/src/main/assets/voice-ru-0.22.zip
+app/src/main/assets/voice-ru-0.22.part

@@ -6,26 +6,36 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+    <permission android:name="ru.svoizadachi.app.permission.MIGRATE_DATA" android:protectionLevel="signature"/>
+    <uses-permission android:name="ru.svoizadachi.app.permission.MIGRATE_DATA"/>
+    <queries><provider android:authorities="ru.svoizadachi.app.migration"/></queries>
 
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
-        android:icon="@drawable/app_icon"
-        android:label="Свои задачи"
+        android:icon="@mipmap/ic_launcher_light"
+        android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+        <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize"/>
+        <activity-alias android:name=".LauncherLight" android:targetActivity=".MainActivity" android:enabled="true" android:exported="true" android:icon="@mipmap/ic_launcher_light">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias android:name=".LauncherDark" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_dark">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity-alias>
+        <provider android:name=".MigrationProvider" android:authorities="${migrationAuthority}" android:exported="true" android:readPermission="ru.svoizadachi.app.permission.MIGRATE_DATA" android:writePermission="ru.svoizadachi.app.permission.MIGRATE_DATA"/>
         <receiver android:name=".ReminderReceiver" android:exported="false"/>
-        <receiver android:name=".TaskWidgetProvider" android:label="Свои задачи — список" android:exported="false">
+        <receiver android:name=".TaskWidgetProvider" android:label="${appLabel} — список" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_tasks_info"/>
         </receiver>
-        <receiver android:name=".TodayWidgetProvider" android:label="Свои задачи — сегодня" android:exported="false">
+        <receiver android:name=".TodayWidgetProvider" android:label="${appLabel} — сегодня" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_tasks_info"/>
         </receiver>

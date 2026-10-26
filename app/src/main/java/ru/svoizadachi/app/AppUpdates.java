@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
 
 /** Only release metadata and APKs are requested. Tasks never leave local storage. */
 public final class AppUpdates {
-    private static final String MANIFEST="https://github.com/iverdiyev/sadachi/releases/latest/download/update.json";
+    private static String manifestUrl(Context c){return "https://github.com/iverdiyev/sadachi/releases/latest/download/"+("com.ilkinsadachi".equals(c.getPackageName())?"update-com.ilkinsadachi.json":"update.json");}
     private static final java.util.concurrent.ExecutorService WORK=Executors.newSingleThreadExecutor();
     private static boolean checking;
     private AppUpdates(){}
@@ -64,7 +64,7 @@ public final class AppUpdates {
         WORK.execute(()->{
             JSONObject metadata=null;String error=null;HttpURLConnection connection=null;
             try{
-                connection=(HttpURLConnection)new URL(MANIFEST).openConnection();connection.setConnectTimeout(10000);connection.setReadTimeout(10000);
+                connection=(HttpURLConnection)new URL(manifestUrl(context)).openConnection();connection.setConnectTimeout(10000);connection.setReadTimeout(10000);
                 connection.setRequestProperty("User-Agent","Sadachi-Android");
                 int status=connection.getResponseCode();
                 if(status==404)error="Опубликованных обновлений пока нет.";
@@ -109,7 +109,7 @@ public final class AppUpdates {
             // Only a failed/partial download of this exact release is replaced.
             if(target.exists()&&!target.delete())throw new IOException("Cannot replace partial APK");
             DownloadManager.Request request=new DownloadManager.Request(Uri.parse(json.getString("apkUrl")))
-                    .setTitle("Свои задачи · "+json.optString("versionName"))
+                    .setTitle("Sadachi · "+json.optString("versionName"))
                     .setDescription("Обновление приложения")
                     .setMimeType("application/vnd.android.package-archive")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

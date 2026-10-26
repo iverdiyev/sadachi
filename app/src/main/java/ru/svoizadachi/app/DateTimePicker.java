@@ -12,6 +12,12 @@ public final class DateTimePicker {
         return due==null?"Выбрать дату":Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern(time?"d MMM yyyy · HH:mm":"d MMM yyyy · без времени",new Locale("ru")));
     }
+    public static String compact(Long due,boolean time){
+        if(due==null)return "Дата и время";
+        ZonedDateTime value=Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault());LocalDate day=value.toLocalDate();
+        String date=day.equals(LocalDate.now())?"Сегодня":day.equals(LocalDate.now().plusDays(1))?"Завтра":value.format(DateTimeFormatter.ofPattern("d MMM",new Locale("ru")));
+        return date+(time?", "+value.format(DateTimeFormatter.ofPattern("HH:mm")):"");
+    }
     public static void show(Activity activity,Long due,Selection callback){
         ZonedDateTime initial=due==null?ZonedDateTime.now().plusHours(1):Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault());
         DatePickerDialog dialog=new DatePickerDialog(activity,(picker,year,month,day)->{

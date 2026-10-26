@@ -57,7 +57,7 @@ public class MainActivityTest {
             MainActivity activity=controller.get();ViewGroup root=content(activity);
             find(root,EditText.class,null).setText("Чай через 2 минуты");
             long before=System.currentTimeMillis();
-            assertTrue(find(root,TextView.class,"＋  Добавить задачу").performClick());
+            assertTrue(find(root,TextView.class,"＋").performClick());
             Task task=new TaskStore(activity).all().get(0);
             assertEquals("Чай",task.title);assertTrue(task.hasTime);assertFalse(task.done);
             assertNotNull(task.dueAt);assertTrue(task.dueAt>=before+120000);
@@ -78,7 +78,7 @@ public class MainActivityTest {
         try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
             MainActivity activity=controller.get();ViewGroup root=content(activity);
             find(root,EditText.class,null).setText("Проект\nОтправить завтра в 18:00 документы");
-            find(root,TextView.class,"＋  Добавить задачу").performClick();
+            find(root,TextView.class,"＋").performClick();
             Task task=new TaskStore(activity).all().get(0);
             assertEquals("Проект",task.title);assertEquals("Отправить завтра в 18:00 документы",task.description);
             assertTrue(task.hasTime);assertNotNull(task.dueAt);

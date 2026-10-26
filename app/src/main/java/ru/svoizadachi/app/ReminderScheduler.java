@@ -57,6 +57,7 @@ public final class ReminderScheduler {
     }
     private static void schedule(Context c,Task task,boolean force){
         AlarmManager alarm=c.getSystemService(AlarmManager.class);
+        if(state(c).getBoolean("migration_paused",false)){alarm.cancel(alarmPending(c,task.id,0));return;}
         long due=effectiveDue(c,task);
         if(task.done||!task.hasTime||due==0||state(c).getLong("posted_"+task.id,0)==due){
             alarm.cancel(alarmPending(c,task.id,0));return;
@@ -130,6 +131,7 @@ public final class ReminderScheduler {
         String event=state(c).getString("event","Пока нет срабатываний");long time=state(c).getLong("event_time",0);
         if(time>0)event+=" · "+Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm:ss"));
         return "Уведомления: "+(notificationsEnabled(c)?"разрешены":"выключены")
+                +(state(c).getBoolean("migration_paused",false)?"\nСтарое приложение: напоминания отключены после переноса":"")
                 +"\nТочные таймеры: "+(hasExactAccess(c)?"разрешены":"нет доступа — возможна задержка")
                 +"\nОптимизация батареи: "+(power.isIgnoringBatteryOptimizations(c.getPackageName())?"без ограничений":"включена")
                 +"\nНадёжный режим Android: "+(reliableMode(c)?"включён (системный будильник)":"выключен")

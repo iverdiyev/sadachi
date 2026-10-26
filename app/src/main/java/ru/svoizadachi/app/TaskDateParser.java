@@ -60,14 +60,20 @@ public final class TaskDateParser {
     private static long number(String amount){
         if(amount==null)return 1;
         String value=amount.toLowerCase(new Locale("ru"));
+        if(value.contains(" ")){long total=0;for(String part:value.trim().split("\\s+"))total+=number(part);return total;}
         switch(value){
-            case "один":case "одну":return 1;case "два":case "две":return 2;case "три":return 3;
+            case "ноль":return 0;case "один":case "одна":case "одну":return 1;case "два":case "две":return 2;case "три":return 3;
             case "четыре":return 4;case "пять":return 5;case "шесть":return 6;case "семь":return 7;
             case "восемь":return 8;case "девять":return 9;case "десять":return 10;
+            case "одиннадцать":return 11;case "двенадцать":return 12;case "тринадцать":return 13;case "четырнадцать":return 14;
+            case "пятнадцать":return 15;case "шестнадцать":return 16;case "семнадцать":return 17;case "восемнадцать":return 18;case "девятнадцать":return 19;
+            case "двадцать":return 20;case "тридцать":return 30;case "сорок":return 40;case "пятьдесят":return 50;
             default:return Long.parseLong(value);
         }
     }
-    private static final String AMOUNT="(?:\\d{1,5}|одну|один|две|два|три|четыре|пять|шесть|семь|восемь|девять|десять)";
+    private static final String ONES="(?:ноль|одну|одна|один|две|два|три|четыре|пять|шесть|семь|восемь|девять)";
+    private static final String WORD_NUMBER="(?:(?:двадцать|тридцать|сорок|пятьдесят)(?:\\s+"+ONES+")?|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|"+ONES+")";
+    private static final String AMOUNT="(?:\\d{1,5}|"+WORD_NUMBER+")";
     public static Result parse(String input, ZonedDateTime now) {
         String work=input==null?"":input.trim();
         if(work.isEmpty()) return new Result("",null,false,NO_REPEAT);
@@ -148,6 +154,14 @@ public final class TaskDateParser {
         if(m!=null){
             time=LocalTime.of(Integer.parseInt(m.match.group(1)),Integer.parseInt(m.match.group(2)));
             work=m.remaining;
+        }
+        if(time==null){
+            m=extract(work,BEFORE_WORD+"в\\s+("+WORD_NUMBER+")"+AFTER_WORD+"(?:\\s*час(?:а|ов)?)?(?:\\s+("+WORD_NUMBER+")"+AFTER_WORD+"(?:\\s*минут(?:у|ы)?)?)?(?:\\s+(утра|дня|вечера|ночи))?"+AFTER_WORD);
+            if(m!=null){
+                int hour=(int)number(m.match.group(1)),minute=m.match.group(2)==null?0:(int)number(m.match.group(2));String part=m.match.group(3);
+                if(part!=null){part=part.toLowerCase(Locale.ROOT);if((part.equals("дня")||part.equals("вечера"))&&hour<12)hour+=12;if(part.equals("ночи")&&hour==12)hour=0;}
+                if(hour<24&&minute<60){time=LocalTime.of(hour,minute);work=m.remaining;}
+            }
         }
         if(time==null){
             m=extract(work,BEFORE_WORD+"в\\s+([01]?\\d|2[0-3])(?:\\s*час(?:а|ов)?)?\\s*(утра|дня|вечера|ночи)?"+AFTER_WORD);

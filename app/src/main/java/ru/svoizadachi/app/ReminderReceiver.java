@@ -7,6 +7,7 @@ import android.graphics.Color;
 public final class ReminderReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context c,Intent intent){
         if(intent==null)return;long id=intent.getLongExtra(ReminderScheduler.EXTRA_ID,-1);if(id<0)return;
+        if(c.getSharedPreferences("reminder_delivery_v2",Context.MODE_PRIVATE).getBoolean("migration_paused",false))return;
         TaskStore store=new TaskStore(c);Task task=store.find(id);if(task==null)return;
         String action=intent.getAction();NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(ReminderScheduler.ACTION_DONE.equals(action)){
@@ -42,7 +43,7 @@ public final class ReminderReceiver extends BroadcastReceiver {
                 .setSmallIcon(R.drawable.ic_notification).setColor(Color.rgb(73,112,223))
                 .setContentTitle(task==null?"Уведомления работают":"Пора: "+task.title)
                 .setContentText(task==null?"Теперь проверь напоминание через 10 секунд с выключенным экраном.":"Заверши задачу или отложи на 10 минут")
-                .setStyle(new Notification.BigTextStyle().bigText(task==null?"Тестовое уведомление «Свои задачи».":task.title))
+                .setStyle(new Notification.BigTextStyle().bigText(task==null?"Тестовое уведомление «Sadachi».":task.title))
                 .setAutoCancel(true).setContentIntent(content).setCategory(Notification.CATEGORY_REMINDER)
                 .setWhen(System.currentTimeMillis()).setShowWhen(true);
         if(task!=null)builder

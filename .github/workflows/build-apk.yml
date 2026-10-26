@@ -36,6 +36,12 @@ jobs:
           mkdir -p parser-tests
           javac -encoding UTF-8 -d parser-tests app/src/main/java/ru/svoizadachi/app/TaskDateParser.java tests/ParserTest.java
           java -cp parser-tests ParserTest
+      - uses: actions/cache@v4
+        with:
+          path: app/src/main/assets/voice-ru-0.22.zip
+          key: vosk-model-small-ru-0.22-v1
+      - name: Встроить русскую офлайн-модель
+        run: python .github/scripts/prepare-voice.py
       - name: Тесты и сборка APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --no-build-cache
       - name: Проверить постоянную подпись APK
@@ -44,6 +50,17 @@ jobs:
           expected=$(sha256sum "$RUNNER_TEMP/sadachi-cert.der" | cut -d ' ' -f 1)
           actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
           test "$expected" = "$actual"
+      - name: Сохранить основной APK
+        run: |
+          mkdir -p release-files
+          cp app/build/outputs/apk/debug/app-debug.apk release-files/Sadachi-new.apk
+      - name: Собрать обновление старого ID для переноса
+        run: |
+          gradle :app:assembleDebug -PsadachiApplicationId=ru.svoizadachi.app --no-daemon --no-build-cache
+          cp app/build/outputs/apk/debug/app-debug.apk release-files/Sadachi-legacy.apk
+          expected=$(sha256sum "$RUNNER_TEMP/sadachi-cert.der" | cut -d ' ' -f 1)
+          actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs release-files/Sadachi-legacy.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test "$expected" = "$actual"
       - name: Отчёты тестов
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,20 +68,13 @@ jobs:
           name: test-reports
           path: app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
-      - name: Демонстрационные скриншоты
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-screenshots
-          path: app/build/screenshots/*.png
-          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Sadachi-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: release-files/*.apk
           if-no-files-found: error
       - name: Опубликовать APK и сведения об обновлении
-        if: github.ref == 'refs/heads/main' && hashFiles('docs/screenshots/light.png') != ''
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/publish-release.py
