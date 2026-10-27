@@ -20,6 +20,18 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
+    <style name="AppTheme.Ios" parent="AppTheme">
+        <item name="android:alertDialogTheme">@style/RoundedDialog.Ios</item>
+        <item name="android:colorAccent">#007AFF</item>
+        <item name="android:windowBackground">#F2F2F7</item>
+        <item name="android:navigationBarColor">#F2F2F7</item>
+    </style>
+    <style name="AppTheme.Ios.Dark" parent="AppTheme.Dark">
+        <item name="android:alertDialogTheme">@style/RoundedDialog.Ios.Dark</item>
+        <item name="android:colorAccent">#0A84FF</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+    </style>
     <style name="RoundedDialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dialog_background</item>
         <item name="android:colorAccent">#4970DF</item>
@@ -31,5 +43,13 @@
         <item name="android:colorAccent">#91ACFF</item>
         <item name="android:windowMinWidthMajor">90%</item>
         <item name="android:windowMinWidthMinor">90%</item>
+    </style>
+    <style name="RoundedDialog.Ios" parent="RoundedDialog">
+        <item name="android:windowBackground">@drawable/dialog_background_ios</item>
+        <item name="android:colorAccent">#007AFF</item>
+    </style>
+    <style name="RoundedDialog.Ios.Dark" parent="RoundedDialog.Dark">
+        <item name="android:windowBackground">@drawable/dialog_background_ios_dark</item>
+        <item name="android:colorAccent">#0A84FF</item>
     </style>
 </resources>

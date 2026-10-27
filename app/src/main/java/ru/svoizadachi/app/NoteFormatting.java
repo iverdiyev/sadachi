@@ -42,10 +42,10 @@ public final class NoteFormatting {
         String[] descriptions={"Жирный текст","Курсив","Подчёркнутый текст","Зачёркнутый текст","Моноширинный текст","Маркированный список"};
         for(int i=0;i<names.length;i++){
             final int index=i;TextView button=new TextView(c);button.setText(names[i]);button.setTextSize(15);
-            button.setTextColor(ThemeSettings.dark(c)?0xFFB6C8FF:0xFF375DBB);button.setGravity(Gravity.CENTER);
+            button.setTextColor(ThemeSettings.ios(c)?ThemeSettings.accent(c):(ThemeSettings.dark(c)?0xFFB6C8FF:0xFF375DBB));button.setGravity(Gravity.CENTER);
             button.setTypeface(Typeface.DEFAULT,i==0?Typeface.BOLD:i==1?Typeface.ITALIC:Typeface.NORMAL);
             button.setContentDescription(descriptions[i]);button.setFocusable(true);
-            GradientDrawable background=new GradientDrawable();background.setColor(ThemeSettings.dark(c)?0xFF2A354B:0xFFEDF1FC);background.setCornerRadius(dp(c,14));
+            GradientDrawable background=new GradientDrawable();background.setColor(ThemeSettings.ios(c)?ThemeSettings.field(c):ThemeSettings.dark(c)?0xFF2A354B:0xFFEDF1FC);background.setCornerRadius(dp(c,ThemeSettings.ios(c)?18:14));
             button.setBackground(background);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(c,i==4?64:48),dp(c,48));p.setMargins(0,dp(c,4),dp(c,6),dp(c,4));row.addView(button,p);
             button.setOnClickListener(v->{if(index==5)bullets(editor);else toggle(editor,index);changed.run();});
         }

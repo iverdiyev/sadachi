@@ -41,6 +41,47 @@ public class BackupAndCompactTest {
         Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);LauncherIcon.setDark(context,true);
         assertTrue(LauncherIcon.dark(context));assertFalse(ThemeSettings.dark(context));LauncherIcon.setDark(context,false);assertFalse(LauncherIcon.dark(context));
     }
+    @Test public void iosStyleIsOptionalAndDoesNotTouchNotesOrTheme(){
+        Application context=RuntimeEnvironment.getApplication();TaskStore store=new TaskStore(context);
+        Task task=new Task(store.allocateId(),"Остаться на месте",null,false,0,false);store.upsert(task);
+        ThemeSettings.setMode(context,1);LauncherIcon.setDark(context,true);
+        assertFalse(ThemeSettings.ios(context));ThemeSettings.setIos(context,true);
+        assertEquals(0xFFF2F2F7,ThemeSettings.background(context));
+        assertEquals(0xFF007AFF,ThemeSettings.accent(context));
+        assertFalse(ThemeSettings.dark(context));assertTrue(LauncherIcon.dark(context));
+        assertEquals("Остаться на месте",store.find(task.id).title);
+        ThemeSettings.setMode(context,2);assertEquals(0xFF000000,ThemeSettings.background(context));
+        assertEquals(0xFF0A84FF,ThemeSettings.accent(context));
+        ThemeSettings.setIos(context,false);assertEquals(0xFF121722,ThemeSettings.background(context));
+        assertEquals("Остаться на месте",store.find(task.id).title);
+    }
+    @Test public void iosWidgetUsesTheSameAccentAsTheApp(){
+        Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);ThemeSettings.setIos(context,true);
+        AppWidgetManager manager=AppWidgetManager.getInstance(context);
+        int id=shadowOf(manager).createWidget(TaskWidgetProvider.class,R.layout.widget_tasks);
+        TaskWidgetProvider.updateAll(context);
+        TextView title=shadowOf(manager).getViewFor(id).findViewById(R.id.widget_title);
+        TextView add=shadowOf(manager).getViewFor(id).findViewById(R.id.widget_add);
+        assertEquals(ThemeSettings.accent(context),title.getCurrentTextColor());
+        assertEquals(ThemeSettings.accent(context),add.getCurrentTextColor());
+        ThemeSettings.setMode(context,2);TaskWidgetProvider.updateAll(context);
+        TextView darkAdd=shadowOf(manager).getViewFor(id).findViewById(R.id.widget_add);
+        assertEquals(ThemeSettings.accent(context),darkAdd.getCurrentTextColor());
+    }
+    @Test public void iosStyleAppliesToHomeAndKeepsInputUsable(){
+        Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);ThemeSettings.setIos(context,true);
+        try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            MainActivity activity=controller.get();View root=((ViewGroup)activity.findViewById(android.R.id.content)).getChildAt(0);
+            assertEquals(ThemeSettings.background(activity),((android.graphics.drawable.ColorDrawable)root.getBackground()).getColor());
+            View input=described(root,"Название задачи и время напоминания");View add=described(root,"Добавить задачу");
+            assertNotNull(input);assertNotNull(add);assertTrue(add.isClickable());
+        }
+    }
+    @Test public void dialogsLeaveMarginsOnPhonesAndDoNotStretchAcrossTablets(){
+        assertEquals(288,RoundedUi.dialogWidth(320,1f));
+        assertEquals(560,RoundedUi.dialogWidth(1200,1f));
+        assertEquals(576,RoundedUi.dialogWidth(640,2f));
+    }
     @Test public void compactEditorCanCreateWithoutAnEmptyTaskOnCancel(){
         Application context=RuntimeEnvironment.getApplication();
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){

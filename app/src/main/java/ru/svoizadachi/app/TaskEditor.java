@@ -27,10 +27,11 @@ public final class TaskEditor {
     public static void show(Activity activity,Task task,Runnable saved){new TaskEditor(activity,task,saved).show();}
     private int dp(int value){return Math.round(value*activity.getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout view=new LinearLayout(activity);view.setOrientation(LinearLayout.VERTICAL);return view;}
-    private int surface(){return ThemeSettings.dark(activity)?0xFF2A354B:0xFFF0F3FC;}
+    private int surface(){return ThemeSettings.field(activity);}
     private GradientDrawable shape(int color,int radius){GradientDrawable drawable=new GradientDrawable();drawable.setColor(color);drawable.setCornerRadius(dp(radius));return drawable;}
     private TextView button(String text){
-        TextView view=new TextView(activity);view.setText(text);view.setTextSize(14);view.setTextColor(ThemeSettings.dark(activity)?0xFFB6C8FF:0xFF375DBB);
+        TextView view=new TextView(activity);view.setText(text);view.setTextSize(14);view.setTextColor(ThemeSettings.ios(activity)?ThemeSettings.accent(activity):
+                (ThemeSettings.dark(activity)?0xFFB6C8FF:0xFF375DBB));
         view.setGravity(Gravity.CENTER_VERTICAL);view.setMinHeight(dp(48));view.setPadding(dp(14),dp(10),dp(14),dp(10));
         view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x224970DF),shape(surface(),16),shape(0xFFFFFFFF,16)));
         view.setClickable(true);view.setFocusable(true);return view;
@@ -40,8 +41,8 @@ public final class TaskEditor {
     private EditText input(String hint,String value,int size){
         EditText edit=new EditText(activity);edit.setText(value);edit.setHint(hint);edit.setTextSize(size);edit.setTextColor(ThemeSettings.text(activity));edit.setHintTextColor(ThemeSettings.subtle(activity));
         edit.setIncludeFontPadding(true);edit.setGravity(Gravity.TOP|Gravity.START);edit.setPadding(dp(16),dp(14),dp(16),dp(14));
-        GradientDrawable background=shape(ThemeSettings.dark(activity)?0xFF1E2635:0xFFFFFFFF,18);
-        background.setStroke(dp(1),ThemeSettings.dark(activity)?0xFF344055:0xFFE1E6F1);edit.setBackground(background);
+        GradientDrawable background=shape(ThemeSettings.card(activity),ThemeSettings.ios(activity)?20:18);
+        background.setStroke(dp(1),ThemeSettings.border(activity));edit.setBackground(background);
         edit.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         return edit;
     }
@@ -65,13 +66,15 @@ public final class TaskEditor {
         folderButton.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle("Папка").setSingleChoiceItems(folders.toArray(new String[0]),selectedFolder,(dialog,choice)->{
             selectedFolder=choice;folderButton.setText("▤  "+folders.get(choice)+"  ▾");dialog.dismiss();
         }).setNegativeButton("Отмена",null).show());
-        title=input("Название задачи",task.title,24);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
+        title=input("Название задачи",task.title,ThemeSettings.ios(activity)?26:24);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
         description=input("Подробности, ссылки, мысли…","",16);description.setText(NoteFormatting.load(task));description.setMinLines(3);description.setMaxLines(12);description.setContentDescription("Описание заметки");form.addView(description,block());
         LinearLayout tools=new LinearLayout(activity);tools.setGravity(Gravity.CENTER_VERTICAL);form.addView(tools,block());
         TextView styles=button("Aa  Форматирование");tools.addView(styles,new LinearLayout.LayoutParams(0,-2,1));
         HorizontalScrollView formatting=NoteFormatting.toolbar(activity,description);formatting.setVisibility(View.GONE);
         styles.setOnClickListener(v->formatting.setVisibility(formatting.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
-        ImageButton microphone=new ImageButton(activity);microphone.setImageResource(R.drawable.voice_mic);microphone.setContentDescription("Голосовой ввод по-русски, офлайн");
+        ImageButton microphone=new ImageButton(activity);microphone.setImageResource(R.drawable.voice_mic);
+        microphone.setImageTintList(ColorStateList.valueOf(ThemeSettings.accent(activity)));
+        microphone.setContentDescription("Голосовой ввод по-русски, офлайн");
         microphone.setBackground(shape(surface(),16));LinearLayout.LayoutParams micLp=new LinearLayout.LayoutParams(dp(48),dp(48));micLp.leftMargin=dp(8);tools.addView(microphone,micLp);
         microphone.setOnClickListener(v->{if(activity instanceof MainActivity)((MainActivity)activity).startVoice(description.hasFocus()?description:title);});
         form.addView(formatting,block());
