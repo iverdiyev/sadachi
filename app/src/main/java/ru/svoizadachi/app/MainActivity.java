@@ -242,24 +242,27 @@ public final class MainActivity extends Activity {
         TextView undo=label("Отменить",13,0xFFB8CEFF,true);undo.setGravity(Gravity.CENTER);touchBackground(undo,dark?CARD:TEXT,12);
         undoBar.addView(undo,lp(96,48));undo.setOnClickListener(v->{if(undoAction!=null)undoAction.run();handler.removeCallbacks(hideUndo);hideUndo.run();});
         LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
-        LinearLayout composer=column();composer.setPadding(dp(10),dp(6),dp(10),dp(6));
-        composer.setBackground(border(CARD,20));
+        LinearLayout composer=column();composer.setPadding(dp(12),dp(10),dp(12),dp(10));
+        composer.setBackground(border(CARD,24));
         hints=new TextSwitcher(this);hints.setFactory(()->label("",12,SUBTLE,false));hints.setCurrentText(HINTS[0]);
         android.view.animation.AnimationSet hintIn=new android.view.animation.AnimationSet(true);
         hintIn.addAnimation(new android.view.animation.AlphaAnimation(0,1));hintIn.addAnimation(new android.view.animation.TranslateAnimation(0,0,dp(5),0));hintIn.setDuration(220);
         android.view.animation.AnimationSet hintOut=new android.view.animation.AnimationSet(true);
         hintOut.addAnimation(new android.view.animation.AlphaAnimation(1,0));hintOut.addAnimation(new android.view.animation.TranslateAnimation(0,0,0,-dp(5)));hintOut.setDuration(160);
         if(motion()){hints.setInAnimation(hintIn);hints.setOutAnimation(hintOut);}composer.addView(hints,lp(-1,-2));
+        boolean compactInput=TaskEditor.stackMetadata(getResources().getConfiguration().screenWidthDp,getResources().getConfiguration().fontScale);
         LinearLayout quickRow=new LinearLayout(this);quickRow.setGravity(Gravity.CENTER_VERTICAL);composer.addView(quickRow,lp(-1,-2));
         entry=new EditText(this);entry.setId(View.generateViewId());entry.setTextSize(16);entry.setTextColor(TEXT);
         entry.setHintTextColor(SUBTLE);entry.setHint("Название задачи или заметки");
         entry.setContentDescription("Название задачи и время напоминания");
-        entry.setBackgroundColor(Color.TRANSPARENT);entry.setPadding(0,dp(8),0,dp(8));
+        entry.setBackground(bg(BACKGROUND,16));entry.setPadding(dp(12),dp(10),dp(12),dp(10));
         entry.setMinLines(1);entry.setMaxLines(3);entry.setGravity(Gravity.TOP|Gravity.START);
         entry.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         entry.setImeOptions(EditorInfo.IME_ACTION_DONE);quickRow.addView(entry,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout actions=compactInput?new LinearLayout(this):quickRow;
+        if(compactInput){actions.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams actionLp=lp(-1,-2);actionLp.topMargin=dp(8);composer.addView(actions,actionLp);}
         ImageButton microphone=new ImageButton(this);microphone.setImageResource(R.drawable.voice_mic);microphone.setImageTintList(ColorStateList.valueOf(PURPLE));microphone.setContentDescription("Голосовой ввод по-русски, офлайн");
-        touchBackground(microphone,BACKGROUND,16);quickRow.addView(microphone,lp(48,48));microphone.setOnClickListener(v->startVoice(entry));
+        touchBackground(microphone,BACKGROUND,16);LinearLayout.LayoutParams micLp=lp(48,48);if(!compactInput)micLp.leftMargin=dp(8);actions.addView(microphone,micLp);microphone.setOnClickListener(v->startVoice(entry));
         dateChip=label(DateTimePicker.format(draftDue,draftHasTime),12,PURPLE,true);dateChip.setPadding(dp(10),dp(12),dp(10),dp(12));
         dateChip.setMinHeight(dp(40));touchBackground(dateChip,BACKGROUND,12);
         dateChip.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Дата задачи")
@@ -294,7 +297,8 @@ public final class MainActivity extends Activity {
         suggestions.addView(shortcuts);composer.addView(suggestions,lp(-1,-2));gap(composer,4);
         TextView add=label("＋",24,dark?BACKGROUND:Color.WHITE,true);add.setContentDescription("Добавить задачу");add.setGravity(Gravity.CENTER);
         add.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,26);
-        touchBackground(add,PURPLE,16);LinearLayout.LayoutParams addLp=lp(48,48);addLp.leftMargin=dp(6);quickRow.addView(add,addLp);add.setOnClickListener(v->createTask());
+        touchBackground(add,PURPLE,16);LinearLayout.LayoutParams addLp=compactInput?new LinearLayout.LayoutParams(0,dp(48),1):lp(48,48);
+        addLp.leftMargin=dp(8);if(compactInput)add.setText("＋  Добавить задачу");actions.addView(add,addLp);add.setOnClickListener(v->createTask());
         entry.setOnEditorActionListener((v,action,event)->{
             if(action==EditorInfo.IME_ACTION_DONE){createTask();return true;}return false;
         });
@@ -332,7 +336,7 @@ public final class MainActivity extends Activity {
             preview.setText("Дату и время можно написать словами");preview.setTextColor(SUBTLE);return;
         }
         preview.setVisibility(View.VISIBLE);
-        if(parsed.dueAt==null){preview.setText("Без напоминания · просто сохранить задачу");preview.setTextColor(SUBTLE);return;}
+        if(parsed.dueAt==null){preview.setVisibility(View.GONE);return;}
         LocalDateTime date=LocalDateTime.ofInstant(Instant.ofEpochMilli(parsed.dueAt),ZoneId.systemDefault());
         String text=(parsed.hasTime?"Напомню: ":"Дата: ")+date.format(DateTimeFormatter.ofPattern("d MMMM",RU));
         if(parsed.hasTime)text+=" в "+date.format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -485,7 +489,7 @@ public final class MainActivity extends Activity {
         for(int i=0;i<FILTER_NAMES.length;i++){
             final int index=i;TextView chip=label(FILTER_NAMES[i],13,i==filter?(dark?BACKGROUND:Color.WHITE):SUBTLE,true);
             chip.setGravity(Gravity.CENTER);chip.setPadding(dp(16),dp(13),dp(16),dp(13));chip.setMinHeight(dp(48));
-            touchBackground(chip,i==filter?PURPLE:CARD,16);
+            touchBackground(chip,i==filter?PURPLE:CARD,24);
             chip.setSelected(i==filter);chip.setContentDescription(FILTER_NAMES[i]+(i==filter?", выбрано":""));
             LinearLayout.LayoutParams p=lp(-2,-2);p.rightMargin=dp(6);chipRow.addView(chip,p);
             chip.setOnClickListener(v->{if(filter!=index){
@@ -541,7 +545,7 @@ public final class MainActivity extends Activity {
     }
     private View createCard(Task task){
         SwipeTaskLayout row=new SwipeTaskLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(2),dp(8),dp(2),dp(8));row.setBackground(border(CARD,18));
+        row.setPadding(dp(8),dp(10),dp(8),dp(10));row.setBackground(border(CARD,22));
         LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(10);cards.addView(row,p);
         CheckBox done=new CheckBox(this);done.setButtonTintList(ColorStateList.valueOf(task.done?GREEN:PURPLE));
         done.setContentDescription((task.done?"Вернуть задачу: ":"Завершить задачу: ")+task.title);
@@ -550,7 +554,7 @@ public final class MainActivity extends Activity {
         row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
         TextView title=label(task.title,16,task.done?SUBTLE:TEXT,true);
         if(task.done)title.setPaintFlags(title.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-        text.addView(title,lp(-1,-2));gap(text,7);
+        title.setMaxLines(3);title.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(title,lp(-1,-2));gap(text,7);
         boolean overdue=!task.done&&task.dueAt!=null&&task.hasTime&&task.dueAt<System.currentTimeMillis();
         TextView date=label(taskDate(task),12,overdue?Color.rgb(177,63,76):task.hasTime?PURPLE:SUBTLE,false);
         dateLabels.put(date,task);
@@ -580,7 +584,7 @@ public final class MainActivity extends Activity {
         EditText description=new EditText(this);description.setTextSize(15);description.setTextColor(TEXT);description.setHintTextColor(SUBTLE);
         description.setHint("Дописать описание…");description.setMinLines(2);description.setMaxLines(8);
         description.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        description.setBackground(bg(BACKGROUND,18));description.setPadding(dp(12),dp(10),dp(12),dp(10));
+        description.setBackground(bg(BACKGROUND,18));description.setPadding(dp(14),dp(12),dp(14),dp(12));
         description.setText(noteDrafts.containsKey(task.id)?noteDrafts.get(task.id):NoteFormatting.load(task));
         description.setOnFocusChangeListener((v,focused)->inlineEditing=focused);
         Runnable retainDraft=()->noteDrafts.put(task.id,new android.text.SpannableStringBuilder(description.getText()));

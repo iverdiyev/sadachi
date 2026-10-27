@@ -57,6 +57,36 @@ public class BackupAndCompactTest {
         }
     }
     private int editors(View view){int count=view instanceof EditText?1:0;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)count+=editors(group.getChildAt(i));}return count;}
+    private View described(View view,String label){if(label.equals(view.getContentDescription()))return view;
+        if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){
+            View found=described(group.getChildAt(i),label);if(found!=null)return found;
+        }}return null;
+    }
+    @Test public void editorMetadataStacksOnPhonesAndAtLargeFont(){
+        assertTrue(TaskEditor.stackMetadata(360,1f));assertTrue(TaskEditor.stackMetadata(600,1.8f));
+        assertFalse(TaskEditor.stackMetadata(600,1f));
+    }
+    @Test public void editorHasRoundedFieldsWithoutNativeSpinners(){
+        try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            TaskEditor.show(controller.get(),new Task(0,"",null,false,0,false),()->{});
+            android.app.AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();View root=dialog.getWindow().getDecorView();
+            View title=described(root,"Заголовок H1"),body=described(root,"Описание заметки"),folder=described(root,"Выбрать папку");
+            assertNotNull(title);assertNotNull(body);assertNotNull(folder);
+            assertTrue(title.getBackground() instanceof android.graphics.drawable.GradientDrawable);
+            assertTrue(body.getBackground() instanceof android.graphics.drawable.GradientDrawable);
+            assertEquals(0,spinners(root));dialog.dismiss();
+        }
+    }
+    private int spinners(View view){int count=view instanceof Spinner?1:0;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)count+=spinners(group.getChildAt(i));}return count;}
+    @Test public void quickInputKeepsFullWidthWhenControlsWrap(){
+        assertTrue(TaskEditor.stackMetadata(360,1f));
+        try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            MainActivity activity=controller.get();View root=activity.findViewById(android.R.id.content);
+            View field=described(root,"Название задачи и время напоминания");View add=described(root,"Добавить задачу");
+            assertNotNull(field);assertNotNull(add);
+            assertNotSame(field.getParent(),add.getParent());
+        }
+    }
     @Test public void largeFontKeepsQuickInputInsideTheWindow(){
         Application context=RuntimeEnvironment.getApplication();android.content.res.Configuration config=new android.content.res.Configuration(context.getResources().getConfiguration());
         config.fontScale=1.8f;context.getResources().updateConfiguration(config,context.getResources().getDisplayMetrics());

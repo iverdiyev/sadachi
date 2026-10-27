@@ -88,7 +88,7 @@ public class NotesAndWidgetsTest {
             TaskEditor.show(controller.get(),task,()->{});shadowOf(Looper.getMainLooper()).idle();AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
             View root=dialog.getWindow().getDecorView();
             for(EditText edit:edits(root))if("Подробности, ссылки, мысли…".contentEquals(edit.getHint()))edit.setText("Описание заметки");
-            find(root,Button.class,"＋ Добавить пункт").performClick();
+            find(root,TextView.class,"＋  Добавить пункт списка").performClick();
             for(EditText edit:edits(root))if("Пункт списка".contentEquals(edit.getHint()))edit.setText("Первый шаг");
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();Task restored=new TaskStore(context).find(task.id);
             assertEquals("Описание заметки",restored.description);assertEquals("Первый шаг",restored.items.get(0).text);

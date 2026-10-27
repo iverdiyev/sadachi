@@ -30,6 +30,12 @@ public class MainActivityTest {
         }
         return null;
     }
+    private View findDescription(View view,String description){
+        if(description.equals(view.getContentDescription()))return view;
+        if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){
+            View found=findDescription(group.getChildAt(i),description);if(found!=null)return found;
+        }}return null;
+    }
     @Test public void systemBarsAndCutoutAreSafeOnAndroid15(){
         try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
             ViewGroup root=content(controller.get());
@@ -57,7 +63,7 @@ public class MainActivityTest {
             MainActivity activity=controller.get();ViewGroup root=content(activity);
             find(root,EditText.class,null).setText("Чай через 2 минуты");
             long before=System.currentTimeMillis();
-            assertTrue(find(root,TextView.class,"＋").performClick());
+            assertTrue(findDescription(root,"Добавить задачу").performClick());
             Task task=new TaskStore(activity).all().get(0);
             assertEquals("Чай",task.title);assertTrue(task.hasTime);assertFalse(task.done);
             assertNotNull(task.dueAt);assertTrue(task.dueAt>=before+120000);
@@ -78,7 +84,7 @@ public class MainActivityTest {
         try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
             MainActivity activity=controller.get();ViewGroup root=content(activity);
             find(root,EditText.class,null).setText("Проект\nОтправить завтра в 18:00 документы");
-            find(root,TextView.class,"＋").performClick();
+            findDescription(root,"Добавить задачу").performClick();
             Task task=new TaskStore(activity).all().get(0);
             assertEquals("Проект",task.title);assertEquals("Отправить завтра в 18:00 документы",task.description);
             assertTrue(task.hasTime);assertNotNull(task.dueAt);
