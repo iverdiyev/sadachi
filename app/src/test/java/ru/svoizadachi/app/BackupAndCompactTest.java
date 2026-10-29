@@ -52,7 +52,7 @@ public class BackupAndCompactTest {
         assertEquals("Остаться на месте",store.find(task.id).title);
         ThemeSettings.setMode(context,2);assertEquals(0xFF000000,ThemeSettings.background(context));
         assertEquals(0xFF0A84FF,ThemeSettings.accent(context));
-        ThemeSettings.setIos(context,false);assertEquals(0xFF121722,ThemeSettings.background(context));
+        ThemeSettings.setIos(context,false);assertEquals(0xFF111622,ThemeSettings.background(context));
         assertEquals("Остаться на месте",store.find(task.id).title);
     }
     @Test public void iosWidgetUsesTheSameAccentAsTheApp(){
@@ -75,7 +75,7 @@ public class BackupAndCompactTest {
             assertEquals(ThemeSettings.background(activity),((android.graphics.drawable.ColorDrawable)root.getBackground()).getColor());
             View input=described(root,"Название задачи и время напоминания");View add=described(root,"Добавить задачу");
             assertNotNull(input);assertNotNull(add);assertTrue(add.isClickable());
-            assertEquals(24f,((TextView)text(root,"Задачи")).getTextSize()/activity.getResources().getDisplayMetrics().scaledDensity,.1f);
+            assertEquals(28f,((TextView)text(root,"Задачи")).getTextSize()/activity.getResources().getDisplayMetrics().scaledDensity,.1f);
             assertEquals("Новая задача или заметка",((EditText)input).getHint().toString());
             View hint=text(root,"Что нужно сделать сегодня?");assertNotNull(hint);
             assertEquals(View.GONE,((View)hint.getParent()).getVisibility());
@@ -87,7 +87,7 @@ public class BackupAndCompactTest {
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
             View root=controller.get().findViewById(android.R.id.content);
             TextView title=(TextView)text(root,"Купить хлеб");assertNotNull(title);
-            assertEquals(16f,title.getTextSize()/context.getResources().getDisplayMetrics().scaledDensity,.1f);
+            assertEquals(15f,title.getTextSize()/context.getResources().getDisplayMetrics().scaledDensity,.1f);
             assertEquals(View.GONE,text(root,"Без даты · в своём темпе").getVisibility());
             title.getParent().requestLayout();
             assertTrue(((View)title.getParent()).performClick());

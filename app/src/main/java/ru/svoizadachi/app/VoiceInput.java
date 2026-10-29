@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.media.*;
 import android.os.*;
 import android.view.Gravity;
+import android.view.WindowManager;
 import android.widget.*;
 import org.json.JSONObject;
 import org.vosk.Model;
@@ -42,27 +43,30 @@ public final class VoiceInput {
     private void start(Result callback){
         Session session=new Session(callback);current=session;
         LinearLayout content=new LinearLayout(activity);content.setOrientation(LinearLayout.VERTICAL);
-        int padding=Math.round(20*activity.getResources().getDisplayMetrics().density);content.setPadding(padding,padding,padding,padding);
-        TextView heading=new TextView(activity);heading.setText("Голосовое добавление");heading.setTextSize(20);
-        heading.setTextColor(ThemeSettings.text(activity));heading.setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);
+        int padding=UiTokens.dp(activity,16);content.setPadding(padding,padding,padding,padding);
+        TextView heading=new TextView(activity);heading.setText("Голосовое добавление");
+        UiTokens.text(heading,UiTokens.SECTION_TEXT,true);heading.setTextColor(ThemeSettings.text(activity));
         content.addView(heading);
-        session.status=new TextView(activity);session.status.setTextColor(ThemeSettings.subtle(activity));session.status.setTextSize(14);
-        session.status.setPadding(0,padding/2,0,padding/2);content.addView(session.status);
-        session.wave=new VoiceWaveform(activity);content.addView(session.wave,new LinearLayout.LayoutParams(-1,Math.round(96*activity.getResources().getDisplayMetrics().density)));
-        TextView transcriptLabel=new TextView(activity);transcriptLabel.setText("Распознанный текст");transcriptLabel.setTextSize(13);
+        session.status=new TextView(activity);session.status.setTextColor(ThemeSettings.subtle(activity));UiTokens.text(session.status,UiTokens.BODY,false);
+        session.status.setPadding(0,UiTokens.dp(activity,8),0,UiTokens.dp(activity,8));content.addView(session.status);
+        session.wave=new VoiceWaveform(activity);content.addView(session.wave,new LinearLayout.LayoutParams(-1,UiTokens.dp(activity,72)));
+        TextView transcriptLabel=new TextView(activity);transcriptLabel.setText("Распознанный текст");UiTokens.text(transcriptLabel,UiTokens.FILTER,false);
         transcriptLabel.setTextColor(ThemeSettings.subtle(activity));content.addView(transcriptLabel);
-        ScrollView transcriptScroll=new ScrollView(activity);transcriptScroll.setFillViewport(true);
-        session.preview=new TextView(activity);session.preview.setTextSize(15);session.preview.setTextColor(ThemeSettings.text(activity));
+        ScrollView transcriptScroll=new ScrollView(activity);
+        session.preview=new TextView(activity);UiTokens.text(session.preview,UiTokens.TASK,false);session.preview.setTextColor(ThemeSettings.text(activity));
         session.preview.setText(EMPTY_PREVIEW);
-        session.preview.setPadding(0,padding/2,0,padding/2);transcriptScroll.addView(session.preview);
-        content.addView(transcriptScroll,new LinearLayout.LayoutParams(-1,0,1));
-        TextView privacy=new TextView(activity);privacy.setText("Офлайн · запись не сохраняется");privacy.setTextSize(12);
+        session.preview.setPadding(0,UiTokens.dp(activity,8),0,UiTokens.dp(activity,8));transcriptScroll.addView(session.preview);
+        content.addView(transcriptScroll,new LinearLayout.LayoutParams(-1,UiTokens.dp(activity,96)));
+        TextView privacy=new TextView(activity);privacy.setText("Офлайн · запись не сохраняется");UiTokens.text(privacy,UiTokens.CAPTION,false);
         privacy.setTextColor(ThemeSettings.subtle(activity));privacy.setGravity(Gravity.CENTER);content.addView(privacy);
         session.dialog=new AlertDialog.Builder(activity).setView(content)
                 .setNegativeButton("Отмена",(d,w)->session.cancelled.set(true))
                 .setNeutralButton("Повторить",null).setPositiveButton("Остановить",null).create();
         session.dialog.setOnDismissListener(d->{session.stop.set(true);session.wave.stop();if(!session.accepted.get())session.cancelled.set(true);if(current==session)current=null;});
         session.dialog.show();RoundedUi.sheet(session.dialog);RoundedUi.actions(session.dialog);
+        // Recording needs room for the actual transcript, not a permanently 75%-high sheet.
+        session.dialog.getWindow().setLayout(RoundedUi.sheetWidth(activity.getResources().getDisplayMetrics().widthPixels,
+                activity.getResources().getDisplayMetrics().density),WindowManager.LayoutParams.WRAP_CONTENT);
         session.dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             if(session.state!=State.LISTENING)return;
             session.stop.set(true);session.wave.stop();render(session,State.TRANSCRIBING);

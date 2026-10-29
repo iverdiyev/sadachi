@@ -35,4 +35,11 @@ public final class DateTimePicker {
                     .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),false);
         });dialog.show();RoundedUi.dialog(dialog);
     }
+    public static void showTime(Activity activity,Long due,Selection callback){
+        ZonedDateTime initial=due==null?ZonedDateTime.now().plusHours(1):Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault());
+        TimePickerDialog dialog=new TimePickerDialog(activity,(view,hour,minute)->
+                callback.selected(initial.toLocalDate().atTime(hour,minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),true),
+                initial.getHour(),initial.getMinute(),true);
+        dialog.setTitle("Время напоминания");dialog.show();RoundedUi.dialog(dialog);
+    }
 }

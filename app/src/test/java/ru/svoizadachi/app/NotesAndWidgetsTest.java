@@ -115,6 +115,17 @@ public class NotesAndWidgetsTest {
             assertFalse(timed[0]);assertEquals(Long.valueOf(LocalDate.of(2027,2,4).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()),result[0]);
         }
     }
+    @Test public void timeChipKeepsThePreviouslyChosenDate(){
+        try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            Long initial=LocalDate.of(2027,1,3).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            Long[] result={null};boolean[] timed={false};
+            DateTimePicker.showTime(controller.get(),initial,(due,time)->{result[0]=due;timed[0]=time;});
+            TimePickerDialog dialog=(TimePickerDialog)org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            TimePicker picker=find(dialog.getWindow().getDecorView(),TimePicker.class,null);picker.setHour(14);picker.setMinute(25);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();
+            assertTrue(timed[0]);assertEquals(Long.valueOf(LocalDate.of(2027,1,3).atTime(14,25).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()),result[0]);
+        }
+    }
     private List<EditText> edits(View view){
         List<EditText> result=new ArrayList<>();if(view instanceof EditText)result.add((EditText)view);
         if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)result.addAll(edits(group.getChildAt(i)));}

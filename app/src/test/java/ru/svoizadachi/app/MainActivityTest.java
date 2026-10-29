@@ -102,4 +102,44 @@ public class MainActivityTest {
             assertEquals("Новое описание",store.find(task.id).description);
         }
     }
+    @Test public void compactBarOpensEditorAndSettingsHideInput(){
+        try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            ViewGroup root=content(controller.get());
+            View field=findDescription(root,"Название задачи и время напоминания");
+            View quick=findDescription(root,"Открыть создание задачи");
+            assertNotNull(quick);assertEquals(View.GONE,((View)field.getParent().getParent()).getVisibility());
+            quick.performClick();assertEquals(View.VISIBLE,((View)field.getParent().getParent()).getVisibility());
+            assertTrue(new TaskStore(controller.get()).all().isEmpty());
+            field.requestFocus();findDescription(root,"Настройки приложения").performClick();
+            assertNotNull(find(root,TextView.class,"Настройки"));
+            assertFalse(field.hasFocus());assertEquals(View.GONE,((View)field.getParent().getParent()).getVisibility());
+            assertNotNull(findDescription(root,"Перенос и резервные копии"));
+            findDescription(root,"Назад к задачам").performClick();
+            assertEquals(View.VISIBLE,((View)field.getParent().getParent()).getVisibility());
+        }
+    }
+    @Test public void editorStaysAboveImeAtPhoneWidths(){
+        for(int widthDp:new int[]{320,360,375,390,393,430}){
+            try(ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+                ViewGroup root=content(controller.get());
+                findDescription(root,"Открыть создание задачи").performClick();
+                View field=findDescription(root,"Название задачи и время напоминания");
+                float density=controller.get().getResources().getDisplayMetrics().density;
+                int width=Math.round(widthDp*density),height=Math.round((widthDp==320?640:720)*density),ime=Math.round(290*density);
+                root.dispatchApplyWindowInsets(new WindowInsets.Builder()
+                        .setInsets(WindowInsets.Type.systemBars(),Insets.of(0,Math.round(24*density),0,Math.round(24*density)))
+                        .setInsets(WindowInsets.Type.ime(),Insets.of(0,0,0,ime)).build());
+                root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));root.layout(0,0,width,height);
+                View editor=(View)field.getParent().getParent();
+                assertEquals(widthDp,ime,root.getPaddingBottom());
+                assertTrue("Editor visible at "+widthDp,editor.getHeight()>0);
+                assertTrue("Editor above IME at "+widthDp,editor.getBottom()<=height-ime);
+                assertTrue("No horizontal overflow at "+widthDp,editor.getRight()<=width-root.getPaddingRight());
+                View save=findDescription(root,"Добавить задачу");
+                assertEquals("Save stays visible at "+widthDp,View.VISIBLE,save.getVisibility());
+                assertTrue("Save has tappable width at "+widthDp,save.getWidth()>=Math.round(80*density));
+            }
+        }
+    }
 }

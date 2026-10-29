@@ -18,10 +18,17 @@ public class ThemeAndUpdatesTest {
         assertEquals(2,ThemeSettings.mode(context));assertTrue(ThemeSettings.dark(context));
         ThemeSettings.setMode(context,1);assertFalse(ThemeSettings.dark(context));
     }
+    @Test public void accentChoicePersistsWithoutOverridingIosPalette(){
+        Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);
+        ThemeSettings.setAccentChoice(context,2);
+        assertEquals(2,ThemeSettings.accentChoice(context));assertEquals(0xFF258577,ThemeSettings.accent(context));
+        ThemeSettings.setIos(context,true);assertEquals(0xFF007AFF,ThemeSettings.accent(context));
+        ThemeSettings.setIos(context,false);assertEquals(0xFF258577,ThemeSettings.accent(context));
+    }
     @Test public void darkActivityStartsWithReadablePalette(){
         ThemeSettings.setMode(RuntimeEnvironment.getApplication(),2);
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
-            assertEquals(0xFFF0F2FA,ThemeSettings.text(controller.get()));
+            assertEquals(0xFFE8ECF6,ThemeSettings.text(controller.get()));
             assertEquals(0,controller.get().getWindow().getDecorView().getSystemUiVisibility()&View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
     }

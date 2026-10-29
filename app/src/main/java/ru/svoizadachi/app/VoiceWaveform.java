@@ -1,6 +1,5 @@
 package ru.svoizadachi.app;
 
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -33,7 +32,8 @@ public final class VoiceWaveform extends View {
         float bar=3*density,gap=4*density,used=32*bar+31*gap;
         float scale=Math.min(1f,getWidth()/used);bar*=scale;gap*=scale;used=32*bar+31*gap;
         float left=(getWidth()-used)/2f,center=getHeight()/2f;
-        float amplitude=ValueAnimator.areAnimatorsEnabled()?level:0f;
+        // Reduced Motion disables decorative transitions, not the live microphone meter.
+        float amplitude=level;
         for(int i=0;i<32;i++){
             float envelope=.35f+.65f*(1f-Math.abs((i-15.5f)/15.5f));
             float variation=.82f+.18f*(float)Math.sin(i*2.31f);

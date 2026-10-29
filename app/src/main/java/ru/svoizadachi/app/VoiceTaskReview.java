@@ -32,13 +32,14 @@ public final class VoiceTaskReview {
     }
     private int dp(int size){return Math.round(size*activity.getResources().getDisplayMetrics().density);}
     private TextView label(String value,int size){
-        TextView view=new TextView(activity);view.setText(value);view.setTextSize(size);view.setTextColor(ThemeSettings.text(activity));return view;
+        TextView view=new TextView(activity);view.setText(value);UiTokens.text(view,size,false);
+        view.setTextColor(ThemeSettings.text(activity));return view;
     }
     private void open(String text){
         ScrollView scroll=new ScrollView(activity);
-        LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(16),dp(12),dp(16),dp(12));scroll.addView(body);
+        LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(16),dp(8),dp(16),dp(16));scroll.addView(body);
         TextView heading=label("Исходный текст · его можно исправить",13);heading.setTextColor(ThemeSettings.subtle(activity));body.addView(heading);
-        transcript=new EditText(activity);transcript.setText(text);transcript.setTextSize(15);transcript.setTextColor(ThemeSettings.text(activity));
+        transcript=new EditText(activity);transcript.setText(text);UiTokens.text(transcript,UiTokens.TASK,false);transcript.setTextColor(ThemeSettings.text(activity));
         transcript.setMinLines(2);transcript.setMaxLines(4);transcript.setContentDescription("Распознанный текст");body.addView(transcript);
         TextView reparse=label("Разобрать текст заново",14);reparse.setTextColor(ThemeSettings.accent(activity));
         reparse.setGravity(Gravity.CENTER_VERTICAL);reparse.setMinHeight(dp(48));body.addView(reparse);
@@ -62,12 +63,12 @@ public final class VoiceTaskReview {
     private void render(){
         changed=false;rows.clear();candidates.removeAllViews();
         for(VoiceTaskParser.Candidate candidate:VoiceTaskParser.parse(transcript.getText().toString(),ZonedDateTime.now())){
-            LinearLayout panel=new LinearLayout(activity);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
+            LinearLayout panel=new LinearLayout(activity);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(12),dp(6),dp(12),dp(6));
             LinearLayout.LayoutParams panelParams=new LinearLayout.LayoutParams(-1,-2);panelParams.bottomMargin=dp(8);
             android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(ThemeSettings.field(activity));shape.setCornerRadius(dp(14));panel.setBackground(shape);
             candidates.addView(panel,panelParams);
             EditText title=new EditText(activity);title.setSingleLine(false);title.setMaxLines(3);title.setText(candidate.title);
-            title.setTextSize(15);title.setTextColor(ThemeSettings.text(activity));title.setHint("Название задачи");
+            UiTokens.text(title,UiTokens.TASK,true);title.setTextColor(ThemeSettings.text(activity));title.setHint("Название задачи");
             title.setContentDescription("Название распознанной задачи: "+candidate.sourceText);panel.addView(title);
             Row row=new Row(title,candidate.dueAt,candidate.hasTime,candidate.repeat,candidate.needsReview,folder);rows.add(row);
             if(candidate.needsReview){TextView warning=label("Неоднозначно: проверь смысл, дату и повтор. Срок не назначен.",12);
@@ -78,23 +79,28 @@ public final class VoiceTaskReview {
             }
             LinearLayout actions=new LinearLayout(activity);actions.setGravity(Gravity.CENTER_VERTICAL);panel.addView(actions);
             TextView date=label(DateTimePicker.format(row.due,row.hasTime),13);date.setTextColor(ThemeSettings.accent(activity));
-            date.setGravity(Gravity.CENTER_VERTICAL);date.setMinHeight(dp(48));date.setMaxLines(2);
+            date.setGravity(Gravity.CENTER_VERTICAL);date.setMinHeight(dp(40));date.setMaxLines(2);
             date.setContentDescription("Изменить дату задачи: "+candidate.sourceText);
             actions.addView(date,new LinearLayout.LayoutParams(0,-2,1));
             date.setOnClickListener(v->DateTimePicker.show(activity,row.due,(due,hasTime)->{
                 row.due=due;row.hasTime=hasTime;date.setText(DateTimePicker.format(due,hasTime));
             }));
-            TextView repeat=label(repeatLabel(row.repeat),13);repeat.setTextColor(ThemeSettings.accent(activity));repeat.setMinHeight(dp(48));
+            LinearLayout metadata=new LinearLayout(activity);metadata.setGravity(Gravity.CENTER_VERTICAL);panel.addView(metadata);
+            TextView repeat=label(repeatLabel(row.repeat),13);repeat.setTextColor(ThemeSettings.accent(activity));repeat.setMinHeight(dp(40));
             repeat.setContentDescription("Повтор задачи: "+candidate.sourceText);
-            repeat.setGravity(Gravity.CENTER_VERTICAL);panel.addView(repeat);
+            repeat.setGravity(Gravity.CENTER_VERTICAL);repeat.setSingleLine(true);
+            repeat.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            metadata.addView(repeat,new LinearLayout.LayoutParams(0,dp(40),1));
             repeat.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle("Повтор")
                     .setSingleChoiceItems(new String[]{"Не повторять","Каждый день","Каждую неделю"},row.repeat,(popup,choice)->{
                         row.repeat=choice;repeat.setText(repeatLabel(choice));popup.dismiss();
                     }).setNegativeButton("Отмена",null).show());
             TextView list=label("Список: "+(row.folder.isEmpty()?"Входящие":row.folder),13);
-            list.setTextColor(ThemeSettings.accent(activity));list.setMinHeight(dp(48));
+            list.setTextColor(ThemeSettings.accent(activity));list.setMinHeight(dp(40));
             list.setGravity(Gravity.CENTER_VERTICAL);list.setContentDescription("Выбрать список задачи: "+candidate.sourceText);
-            panel.addView(list);
+            list.setSingleLine(true);list.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams listParams=new LinearLayout.LayoutParams(0,dp(40),1);listParams.leftMargin=dp(8);
+            metadata.addView(list,listParams);
             list.setOnClickListener(v->{
                 List<String> names=new ArrayList<>();names.add("Входящие");names.addAll(store.folders());
                 int selected=row.folder.isEmpty()?0:Math.max(0,names.indexOf(row.folder));

@@ -40,8 +40,8 @@ public final class TaskEditor {
     static boolean stackMetadata(int widthDp,float fontScale){return widthDp<400||fontScale>1.25f;}
     private EditText input(String hint,String value,int size){
         EditText edit=new EditText(activity);edit.setText(value);edit.setHint(hint);edit.setTextSize(size);edit.setTextColor(ThemeSettings.text(activity));edit.setHintTextColor(ThemeSettings.subtle(activity));
-        edit.setIncludeFontPadding(true);edit.setGravity(Gravity.TOP|Gravity.START);edit.setPadding(dp(16),dp(14),dp(16),dp(14));
-        GradientDrawable background=shape(ThemeSettings.card(activity),ThemeSettings.ios(activity)?20:18);
+        edit.setIncludeFontPadding(false);edit.setGravity(Gravity.TOP|Gravity.START);edit.setPadding(dp(14),dp(12),dp(14),dp(12));
+        GradientDrawable background=shape(ThemeSettings.card(activity),12);
         background.setStroke(dp(1),ThemeSettings.border(activity));edit.setBackground(background);
         edit.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         return edit;
@@ -66,8 +66,8 @@ public final class TaskEditor {
         folderButton.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle("Папка").setSingleChoiceItems(folders.toArray(new String[0]),selectedFolder,(dialog,choice)->{
             selectedFolder=choice;folderButton.setText("▤  "+folders.get(choice)+"  ▾");dialog.dismiss();
         }).setNegativeButton("Отмена",null).show());
-        title=input("Название задачи",task.title,24);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
-        description=input("Подробности, ссылки, мысли…","",16);description.setText(NoteFormatting.load(task));description.setMinLines(3);description.setMaxLines(12);description.setContentDescription("Описание заметки");form.addView(description,block());
+        title=input("Название задачи",task.title,18);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
+        description=input("Подробности, ссылки, мысли…","",14);description.setText(NoteFormatting.load(task));description.setMinLines(2);description.setMaxLines(12);description.setContentDescription("Описание заметки");form.addView(description,block());
         LinearLayout tools=new LinearLayout(activity);tools.setGravity(Gravity.CENTER_VERTICAL);form.addView(tools,block());
         TextView styles=button("Aa  Форматирование");tools.addView(styles,new LinearLayout.LayoutParams(0,-2,1));
         HorizontalScrollView formatting=NoteFormatting.toolbar(activity,description);formatting.setVisibility(View.GONE);
