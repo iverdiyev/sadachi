@@ -75,12 +75,33 @@ public class BackupAndCompactTest {
             assertEquals(ThemeSettings.background(activity),((android.graphics.drawable.ColorDrawable)root.getBackground()).getColor());
             View input=described(root,"Название задачи и время напоминания");View add=described(root,"Добавить задачу");
             assertNotNull(input);assertNotNull(add);assertTrue(add.isClickable());
+            assertEquals(24f,((TextView)text(root,"Задачи")).getTextSize()/activity.getResources().getDisplayMetrics().scaledDensity,.1f);
+            assertEquals("Новая задача или заметка",((EditText)input).getHint().toString());
+            View hint=text(root,"Что нужно сделать сегодня?");assertNotNull(hint);
+            assertEquals(View.GONE,((View)hint.getParent()).getVisibility());
+        }
+    }
+    @Test public void iosListKeepsSimpleTasksCompactAndDetailsAccessible(){
+        Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);ThemeSettings.setIos(context,true);
+        TaskStore store=new TaskStore(context);Task task=new Task(store.allocateId(),"Купить хлеб",null,false,0,false);store.upsert(task);
+        try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
+            View root=controller.get().findViewById(android.R.id.content);
+            TextView title=(TextView)text(root,"Купить хлеб");assertNotNull(title);
+            assertEquals(16f,title.getTextSize()/context.getResources().getDisplayMetrics().scaledDensity,.1f);
+            assertEquals(View.GONE,text(root,"Без даты · в своём темпе").getVisibility());
+            title.getParent().requestLayout();
+            assertTrue(((View)title.getParent()).performClick());
+            assertEquals(View.VISIBLE,text(root,"Заметка ▾").getVisibility());
         }
     }
     @Test public void dialogsLeaveMarginsOnPhonesAndDoNotStretchAcrossTablets(){
         assertEquals(288,RoundedUi.dialogWidth(320,1f));
         assertEquals(560,RoundedUi.dialogWidth(1200,1f));
         assertEquals(576,RoundedUi.dialogWidth(640,2f));
+        assertEquals(320,RoundedUi.sheetWidth(320,1f));
+        assertEquals(520,RoundedUi.sheetWidth(1200,1f));
+        assertEquals(480,RoundedUi.sheetHeight(640,1f));
+        assertEquals(620,RoundedUi.sheetHeight(1200,1f));
     }
     @Test public void compactEditorCanCreateWithoutAnEmptyTaskOnCancel(){
         Application context=RuntimeEnvironment.getApplication();
@@ -98,6 +119,9 @@ public class BackupAndCompactTest {
         }
     }
     private int editors(View view){int count=view instanceof EditText?1:0;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)count+=editors(group.getChildAt(i));}return count;}
+    private View text(View view,String value){if(view instanceof TextView&&value.contentEquals(((TextView)view).getText()))return view;
+        if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){View found=text(group.getChildAt(i),value);if(found!=null)return found;}}return null;
+    }
     private View described(View view,String label){if(label.equals(view.getContentDescription()))return view;
         if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){
             View found=described(group.getChildAt(i),label);if(found!=null)return found;

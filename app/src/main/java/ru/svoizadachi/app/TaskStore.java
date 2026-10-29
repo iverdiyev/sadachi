@@ -42,6 +42,25 @@ public final class TaskStore {
         save(list);
         }
     }
+    /** Persist a confirmed voice batch with one commit and one widget refresh. */
+    public boolean addBatch(List<Task> batch){
+        if(batch==null||batch.isEmpty())return false;
+        synchronized(LOCK){
+            List<Task> all=all();long next=pref.getLong("nextId",0L);
+            for(Task existing:all)next=Math.max(next,existing.id);
+            for(Task task:batch){if(task==null||task.title==null||task.title.trim().isEmpty()||task.id!=0)return false;}
+            JSONArray values=new JSONArray();
+            for(Task task:all)try{values.put(task.json());}catch(JSONException ignored){return false;}
+            for(Task task:batch){
+                task.id=++next;
+                try{values.put(task.json());}catch(JSONException ignored){for(Task created:batch)created.id=0;return false;}
+            }
+            if(!pref.edit().putString("tasks",values.toString()).putLong("nextId",next).commit()){
+                for(Task created:batch)created.id=0;return false;
+            }
+            TaskWidgetProvider.updateAll(context);return true;
+        }
+    }
     public void remove(long id){
         synchronized(LOCK){
         List<Task> list=all();

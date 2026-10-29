@@ -66,7 +66,7 @@ public final class TaskEditor {
         folderButton.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle("Папка").setSingleChoiceItems(folders.toArray(new String[0]),selectedFolder,(dialog,choice)->{
             selectedFolder=choice;folderButton.setText("▤  "+folders.get(choice)+"  ▾");dialog.dismiss();
         }).setNegativeButton("Отмена",null).show());
-        title=input("Название задачи",task.title,ThemeSettings.ios(activity)?26:24);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
+        title=input("Название задачи",task.title,24);title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));title.setMinLines(1);title.setMaxLines(4);title.setContentDescription("Заголовок H1");form.addView(title,block());
         description=input("Подробности, ссылки, мысли…","",16);description.setText(NoteFormatting.load(task));description.setMinLines(3);description.setMaxLines(12);description.setContentDescription("Описание заметки");form.addView(description,block());
         LinearLayout tools=new LinearLayout(activity);tools.setGravity(Gravity.CENTER_VERTICAL);form.addView(tools,block());
         TextView styles=button("Aa  Форматирование");tools.addView(styles,new LinearLayout.LayoutParams(0,-2,1));

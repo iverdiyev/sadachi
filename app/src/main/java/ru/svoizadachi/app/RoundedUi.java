@@ -23,6 +23,21 @@ public final class RoundedUi {
         window.setLayout(width,WindowManager.LayoutParams.WRAP_CONTENT);
     }
     static int dialogWidth(int screenPixels,float density){return Math.min(Math.max(1,screenPixels-Math.round(32*density)),Math.round(560*density));}
+    static int sheetWidth(int screenPixels,float density){return Math.min(screenPixels,Math.round(520*density));}
+    static int sheetHeight(int screenPixels,float density){return Math.min(Math.round(screenPixels*.75f),Math.round(620*density));}
+    public static void sheet(AlertDialog dialog){
+        Window window=dialog.getWindow();if(window==null)return;
+        Context context=dialog.getContext();float density=context.getResources().getDisplayMetrics().density;
+        GradientDrawable background=new GradientDrawable();background.setColor(ThemeSettings.card(context));
+        float radius=24*density;background.setCornerRadii(new float[]{radius,radius,radius,radius,0,0,0,0});
+        window.setBackgroundDrawable(background);window.getDecorView().setClipToOutline(true);
+        window.getDecorView().setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        window.setGravity(Gravity.BOTTOM);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        WindowManager.LayoutParams params=window.getAttributes();params.dimAmount=.28f;window.setAttributes(params);
+        window.setLayout(sheetWidth(context.getResources().getDisplayMetrics().widthPixels,density),
+                sheetHeight(context.getResources().getDisplayMetrics().heightPixels,density));
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+    }
     public static void actions(AlertDialog dialog){
         for(int which:new int[]{AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEGATIVE}){
             Button button=dialog.getButton(which);if(button==null)continue;

@@ -204,13 +204,13 @@ public final class MainActivity extends Activity {
         scroll.setVerticalScrollBarEnabled(false);scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         boolean ios=iosStyle;
-        LinearLayout page=column();page.setPadding(dp(ios?20:16),dp(ios?14:10),dp(ios?20:16),dp(20));
+        LinearLayout page=column();page.setPadding(dp(16),dp(10),dp(16),dp(20));
         scroll.addView(page,new ScrollView.LayoutParams(-1,-2));
 
         TextView date=label(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM",RU)),13,SUBTLE,false);
         page.addView(date,lp(-1,-2));gap(page,8);
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=label("Задачи",ios?32:24,TEXT,true);
+        TextView title=label("Задачи",24,TEXT,true);
         heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         TextView theme=label(dark?"☀":"☾",24,PURPLE,true);theme.setGravity(Gravity.CENTER);
         theme.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,24);
@@ -224,7 +224,7 @@ public final class MainActivity extends Activity {
         folderLabel=label("Все заметки  ▾",14,PURPLE,true);folderLabel.setPadding(dp(ios?16:10),dp(12),dp(ios?16:10),dp(12));
         folderLabel.setMinHeight(dp(44));touchBackground(folderLabel,CARD,ios?22:14);
         folderLabel.setOnClickListener(v->showFolders());folderLabel.setOnLongClickListener(v->{manageFolders();return true;});
-        LinearLayout.LayoutParams foldersLp=lp(ios?-2:-1,-2);foldersLp.topMargin=dp(ios?12:4);page.addView(folderLabel,foldersLp);
+        LinearLayout.LayoutParams foldersLp=lp(ios?-2:-1,-2);foldersLp.topMargin=dp(4);page.addView(folderLabel,foldersLp);
 
         LinearLayout hero=column();hero.setPadding(dp(18),dp(16),dp(18),dp(16));
         GradientDrawable gradient=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -245,18 +245,19 @@ public final class MainActivity extends Activity {
         TextView undo=label("Отменить",13,0xFFB8CEFF,true);undo.setGravity(Gravity.CENTER);touchBackground(undo,dark?CARD:TEXT,12);
         undoBar.addView(undo,lp(96,48));undo.setOnClickListener(v->{if(undoAction!=null)undoAction.run();handler.removeCallbacks(hideUndo);hideUndo.run();});
         LinearLayout.LayoutParams undoLp=lp(-1,-2);undoLp.setMargins(dp(20),0,dp(20),dp(8));root.addView(undoBar,undoLp);
-        LinearLayout composer=column();composer.setPadding(dp(12),dp(10),dp(12),dp(10));
+        LinearLayout composer=column();composer.setPadding(dp(12),dp(ios?8:10),dp(12),dp(ios?8:10));
         composer.setBackground(ios?bg(CARD,28):border(CARD,24));
         hints=new TextSwitcher(this);hints.setFactory(()->label("",12,SUBTLE,false));hints.setCurrentText(HINTS[0]);
         android.view.animation.AnimationSet hintIn=new android.view.animation.AnimationSet(true);
         hintIn.addAnimation(new android.view.animation.AlphaAnimation(0,1));hintIn.addAnimation(new android.view.animation.TranslateAnimation(0,0,dp(5),0));hintIn.setDuration(220);
         android.view.animation.AnimationSet hintOut=new android.view.animation.AnimationSet(true);
         hintOut.addAnimation(new android.view.animation.AlphaAnimation(1,0));hintOut.addAnimation(new android.view.animation.TranslateAnimation(0,0,0,-dp(5)));hintOut.setDuration(160);
-        if(motion()){hints.setInAnimation(hintIn);hints.setOutAnimation(hintOut);}composer.addView(hints,lp(-1,-2));
+        if(motion()&&!ios){hints.setInAnimation(hintIn);hints.setOutAnimation(hintOut);}composer.addView(hints,lp(-1,-2));
+        if(ios)hints.setVisibility(View.GONE);
         boolean compactInput=TaskEditor.stackMetadata(getResources().getConfiguration().screenWidthDp,getResources().getConfiguration().fontScale);
         LinearLayout quickRow=new LinearLayout(this);quickRow.setGravity(Gravity.CENTER_VERTICAL);composer.addView(quickRow,lp(-1,-2));
         entry=new EditText(this);entry.setId(View.generateViewId());entry.setTextSize(16);entry.setTextColor(TEXT);
-        entry.setHintTextColor(SUBTLE);entry.setHint("Название задачи или заметки");
+        entry.setHintTextColor(SUBTLE);entry.setHint(ios?"Новая задача или заметка":"Название задачи или заметки");
         entry.setContentDescription("Название задачи и время напоминания");
         entry.setBackground(bg(ios?ThemeSettings.field(this):BACKGROUND,ios?20:16));entry.setPadding(dp(12),dp(10),dp(12),dp(10));
         entry.setMinLines(1);entry.setMaxLines(3);entry.setGravity(Gravity.TOP|Gravity.START);
@@ -265,9 +266,9 @@ public final class MainActivity extends Activity {
         LinearLayout actions=compactInput?new LinearLayout(this):quickRow;
         if(compactInput){actions.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams actionLp=lp(-1,-2);actionLp.topMargin=dp(8);composer.addView(actions,actionLp);}
         ImageButton microphone=new ImageButton(this);microphone.setImageResource(R.drawable.voice_mic);microphone.setImageTintList(ColorStateList.valueOf(PURPLE));microphone.setContentDescription("Голосовой ввод по-русски, офлайн");
-        touchBackground(microphone,BACKGROUND,16);LinearLayout.LayoutParams micLp=lp(48,48);if(!compactInput)micLp.leftMargin=dp(8);actions.addView(microphone,micLp);microphone.setOnClickListener(v->startVoice(entry));
+        touchBackground(microphone,ios?ThemeSettings.field(this):BACKGROUND,16);LinearLayout.LayoutParams micLp=lp(48,48);if(!compactInput)micLp.leftMargin=dp(8);actions.addView(microphone,micLp);microphone.setOnClickListener(v->startVoiceCapture());
         dateChip=label(DateTimePicker.format(draftDue,draftHasTime),12,PURPLE,true);dateChip.setPadding(dp(10),dp(12),dp(10),dp(12));
-        dateChip.setMinHeight(dp(40));touchBackground(dateChip,BACKGROUND,12);
+        dateChip.setMinHeight(dp(48));touchBackground(dateChip,ios?ThemeSettings.field(this):BACKGROUND,12);
         dateChip.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Дата задачи")
                 .setItems(new String[]{"Выбрать дату и время","Убрать выбранную дату"},(dialog,index)->{
                     if(index==0)DateTimePicker.show(this,draftDue,(due,time)->setDraftDate(due,time));else setDraftDate(null,false);
@@ -297,8 +298,8 @@ public final class MainActivity extends Activity {
                 updatePreview();
             });
         }
-        suggestions.addView(shortcuts);composer.addView(suggestions,lp(-1,-2));gap(composer,4);
-        TextView add=label("＋",24,dark?BACKGROUND:Color.WHITE,true);add.setContentDescription("Добавить задачу");add.setGravity(Gravity.CENTER);
+        suggestions.addView(shortcuts);composer.addView(suggestions,lp(-1,-2));if(!ios)gap(composer,4);
+        TextView add=label("＋",24,Color.WHITE,true);add.setContentDescription("Добавить задачу");add.setGravity(Gravity.CENTER);
         add.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,26);
         touchBackground(add,PURPLE,16);LinearLayout.LayoutParams addLp=compactInput?new LinearLayout.LayoutParams(0,dp(48),1):lp(48,48);
         addLp.leftMargin=dp(8);if(compactInput)add.setText("＋  Добавить задачу");actions.addView(add,addLp);add.setOnClickListener(v->createTask());
@@ -308,12 +309,12 @@ public final class MainActivity extends Activity {
         entry.addTextChangedListener(new TextWatcher(){
             @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
             @Override public void onTextChanged(CharSequence s,int start,int before,int count){
-                hints.setVisibility(s.length()==0?View.VISIBLE:View.GONE);
+                if(!ios)hints.setVisibility(s.length()==0?View.VISIBLE:View.GONE);
                 handler.removeCallbacks(previewUpdate);handler.postDelayed(previewUpdate,100);
             }
             @Override public void afterTextChanged(Editable e){}
         });
-        LinearLayout.LayoutParams composerLp=lp(-1,-2);composerLp.setMargins(dp(12),dp(4),dp(12),dp(8));
+        LinearLayout.LayoutParams composerLp=lp(-1,-2);composerLp.setMargins(dp(12),dp(4),dp(12),dp(ios?4:8));
         root.addView(composer,composerLp);
 
         permissionCard=column();permissionCard.setPadding(dp(16),dp(14),dp(16),dp(14));
@@ -395,6 +396,16 @@ public final class MainActivity extends Activity {
             target.getText().replace(start,end,prefix+text);target.setSelection(start+prefix.length()+text.length());target.requestFocus();
         });
     }
+    private void startVoiceCapture(){
+        if(voice==null)return;
+        voice.request(text->{
+            if(isFinishing()||isDestroyed())return;
+            VoiceTaskReview.show(this,store,selectedFolder,text,()->{
+                filter=0;refresh(true);
+                if(store.all().stream().anyMatch(t->t.hasTime&&t.dueAt!=null))ensureReminderAccess();
+            });
+        });
+    }
     private void maybeAskExact(){
         if(Build.VERSION.SDK_INT>=31&&!ReminderScheduler.hasExactAccess(this)&&!askedExact){
             askedExact=true;
@@ -470,7 +481,7 @@ public final class MainActivity extends Activity {
     }
     private void showAppSettings(){
         new AlertDialog.Builder(this).setTitle("Настройки")
-                .setItems(new String[]{"Тема приложения","Обновления","Напоминания","Как добавить виджет","Иконка приложения","Перенос и резервные копии","Стиль интерфейса"},(d,index)->{
+                .setItems(new String[]{"Тема приложения","Обновления","Напоминания","Как добавить виджет","Иконка приложения","Перенос и резервные копии","Стиль интерфейса","Голосовой ввод"},(d,index)->{
                     if(index==0)new AlertDialog.Builder(this).setTitle("Тема приложения")
                             .setSingleChoiceItems(new String[]{"Как в системе","Светлая","Тёмная"},ThemeSettings.mode(this),(dialog,mode)->{
                                 ThemeSettings.setMode(this,mode);TaskWidgetProvider.updateAll(this);dialog.dismiss();recreate();
@@ -486,6 +497,12 @@ public final class MainActivity extends Activity {
                             .setSingleChoiceItems(new String[]{"Sadachi","iOS‑подобный"},ThemeSettings.ios(this)?1:0,(dialog,choice)->{
                                 ThemeSettings.setIos(this,choice==1);TaskWidgetProvider.updateAll(this);dialog.dismiss();recreate();
                             }).setNegativeButton("Отмена",null).show();
+                    else if(index==7){int silence=VoiceSettings.silenceMillis(this);
+                        new AlertDialog.Builder(this).setTitle("Окончание голосовой записи")
+                                .setSingleChoiceItems(new String[]{"Остановить вручную","После тишины 2,5 секунды","После тишины 4 секунды"},silence==2500?1:silence==4000?2:0,(dialog,choice)->{
+                                    VoiceSettings.setSilenceMillis(this,choice==1?2500:choice==2?4000:0);dialog.dismiss();
+                                }).setNegativeButton("Отмена",null).show();
+                    }
                     else new AlertDialog.Builder(this).setTitle("Виджеты")
                             .setMessage("Зажми свободное место на рабочем столе → Виджеты → Sadachi. Выбери «Список» или «Сегодня». Размер можно изменить долгим нажатием на виджет.")
                             .setPositiveButton("Понятно",null).show();
@@ -494,7 +511,7 @@ public final class MainActivity extends Activity {
     private void renderChips(){
         chipRow.removeAllViews();
         for(int i=0;i<FILTER_NAMES.length;i++){
-            final int index=i;TextView chip=label(FILTER_NAMES[i],13,i==filter?(dark?BACKGROUND:Color.WHITE):SUBTLE,true);
+            final int index=i;TextView chip=label(FILTER_NAMES[i],13,i==filter?Color.WHITE:SUBTLE,true);
             chip.setGravity(Gravity.CENTER);chip.setPadding(dp(16),dp(13),dp(16),dp(13));chip.setMinHeight(dp(48));
             touchBackground(chip,i==filter?PURPLE:CARD,24);
             chip.setSelected(i==filter);chip.setContentDescription(FILTER_NAMES[i]+(i==filter?", выбрано":""));
@@ -552,22 +569,26 @@ public final class MainActivity extends Activity {
     }
     private View createCard(Task task){
         SwipeTaskLayout row=new SwipeTaskLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-        boolean ios=iosStyle;row.setPadding(dp(ios?12:8),dp(ios?14:10),dp(ios?12:8),dp(ios?14:10));row.setBackground(ios?bg(CARD,24):border(CARD,22));
+        boolean ios=iosStyle;row.setPadding(dp(8),dp(10),dp(8),dp(10));row.setBackground(ios?bg(CARD,20):border(CARD,22));
         LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(ios?8:10);cards.addView(row,p);
         CheckBox done=new CheckBox(this);done.setButtonTintList(ColorStateList.valueOf(task.done?GREEN:PURPLE));
         done.setContentDescription((task.done?"Вернуть задачу: ":"Завершить задачу: ")+task.title);
         done.setChecked(task.done);row.addView(done,lp(48,48));
         LinearLayout text=column();text.setPadding(dp(2),dp(2),dp(2),dp(2));
         row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
-        TextView title=label(task.title,ios?17:16,task.done?SUBTLE:TEXT,true);
+        TextView title=label(task.title,16,task.done?SUBTLE:TEXT,true);
         if(task.done)title.setPaintFlags(title.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-        title.setMaxLines(3);title.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(title,lp(-1,-2));gap(text,7);
+        title.setMaxLines(3);title.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(title,lp(-1,-2));
         boolean overdue=!task.done&&task.dueAt!=null&&task.hasTime&&task.dueAt<System.currentTimeMillis();
         TextView date=label(taskDate(task),12,overdue?Color.rgb(177,63,76):task.hasTime?PURPLE:SUBTLE,false);
         dateLabels.put(date,task);
-        text.addView(date,lp(-1,-2));
-        TextView summary=label((task.folder.isEmpty()?"":task.folder+" · ")+(task.items.isEmpty()?"Раскрыть заметку ▾":task.completedItems()+"/"+task.items.size()+" пунктов ▾"),12,SUBTLE,false);
-        LinearLayout.LayoutParams summaryLp=lp(-1,-2);summaryLp.topMargin=dp(7);text.addView(summary,summaryLp);
+        LinearLayout.LayoutParams dateLp=lp(-1,-2);dateLp.topMargin=dp(ios?3:7);text.addView(date,dateLp);
+        if(ios&&task.dueAt==null)date.setVisibility(View.GONE);
+        boolean hasDetails=!task.description.trim().isEmpty()||!task.descriptionHtml.isEmpty()||!task.items.isEmpty();
+        boolean hideSummary=ios&&!hasDetails&&task.folder.isEmpty();
+        TextView summary=label((task.folder.isEmpty()?"":task.folder+" · ")+(task.items.isEmpty()?(ios?"Заметка ▾":"Раскрыть заметку ▾"):task.completedItems()+"/"+task.items.size()+" пунктов ▾"),12,SUBTLE,false);
+        LinearLayout.LayoutParams summaryLp=lp(-1,-2);summaryLp.topMargin=dp(ios?3:7);text.addView(summary,summaryLp);
+        if(hideSummary&&!expanded.contains(task.id))summary.setVisibility(View.GONE);
         LinearLayout details=column();details.setVisibility(expanded.contains(task.id)?View.VISIBLE:View.GONE);text.addView(details,lp(-1,-2));
         row.setSwipeEnabled(!expanded.contains(task.id));
         if(expanded.contains(task.id))buildDetails(task,details,summary);
@@ -576,6 +597,7 @@ public final class MainActivity extends Activity {
             if(open&&details.getChildCount()==0)buildDetails(task,details,summary);
             if(motion())android.transition.TransitionManager.beginDelayedTransition(cards,new android.transition.AutoTransition().setDuration(160));
             if(open)expanded.add(task.id);else expanded.remove(task.id);details.setVisibility(open?View.VISIBLE:View.GONE);
+            if(hideSummary)summary.setVisibility(open?View.VISIBLE:View.GONE);
             row.setSwipeEnabled(!open);row.setGravity(open?Gravity.TOP:Gravity.CENTER_VERTICAL);
         });
         text.setFocusable(true);text.setContentDescription(task.title+". "+taskDate(task)+". Раскрыть описание и чек-лист");
