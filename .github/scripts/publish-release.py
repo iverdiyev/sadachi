@@ -36,7 +36,8 @@ if exists:
 else:
     subprocess.run([
         "gh", "release", "create", tag, *assets,
-        "--target", os.environ["GITHUB_SHA"], "--latest",
+        "--target", os.environ["GITHUB_SHA"],
+        "--prerelease" if os.environ.get("SADACHI_PRERELEASE") == "true" else "--latest",
         "--title", f"Sadachi {version}",
         "--notes", Path("CHANGELOG.md").read_text(encoding="utf-8").split("\n# ",1)[0]
         + "\n\nОсновное приложение: com.ilkinsadachi. Файл legacy обновляет старое приложение для переноса данных. Инструкции — в README. Установка подтверждается Android.",

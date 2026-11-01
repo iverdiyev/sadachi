@@ -20,4 +20,14 @@ public class VoiceSettingsTest {
     @Test(expected=IllegalArgumentException.class) public void rejectsUnsupportedPause(){
         VoiceSettings.setSilenceMillis(RuntimeEnvironment.getApplication(),100);
     }
+    @Test public void tenMinutesByDefaultAndDurationChoicePersists(){
+        Application app=RuntimeEnvironment.getApplication();
+        assertEquals(600_000,VoiceSettings.maxDurationMillis(app));
+        VoiceSettings.setMaxMinutes(app,5);assertEquals(300_000,VoiceSettings.maxDurationMillis(app));
+        VoiceSettings.setMaxMinutes(app,2);assertEquals(120_000,VoiceSettings.maxDurationMillis(app));
+        VoiceSettings.setMaxMinutes(app,10);
+    }
+    @Test(expected=IllegalArgumentException.class) public void rejectsUnsupportedDuration(){
+        VoiceSettings.setMaxMinutes(RuntimeEnvironment.getApplication(),1);
+    }
 }

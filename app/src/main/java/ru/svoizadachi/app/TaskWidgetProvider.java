@@ -40,6 +40,11 @@ public class TaskWidgetProvider extends AppWidgetProvider {
                 .putExtra("open_task",id).putExtra("new_task",add).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return PendingIntent.getActivity(c,0,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
     }
+    private static PendingIntent voice(Context c){
+        Intent intent=new Intent(c,MainActivity.class).setData(Uri.parse("sadachi://open/voice"))
+                .putExtra("voice_task",true).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(c,0,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+    }
     private static void render(Context c,AppWidgetManager manager,int id,boolean today,Class<?> provider,List<Task> source){
         RemoteViews view=new RemoteViews(c.getPackageName(),R.layout.widget_tasks);
         view.setInt(R.id.widget_root,"setBackgroundResource",ThemeSettings.ios(c)?
@@ -47,20 +52,24 @@ public class TaskWidgetProvider extends AppWidgetProvider {
                 (ThemeSettings.dark(c)?R.drawable.widget_background_dark:R.drawable.widget_background));
         view.setTextColor(R.id.widget_title,ThemeSettings.text(c));view.setTextColor(R.id.widget_count,ThemeSettings.subtle(c));
         view.setTextColor(R.id.widget_empty,ThemeSettings.subtle(c));
-        view.setTextColor(R.id.widget_footer,ThemeSettings.dark(c)?0xFFB6C8FF:0xFF375DBB);
+        view.setTextColor(R.id.widget_footer,ThemeSettings.accent(c));
         List<Task> tasks=visibleTasks(source,today);
         view.setTextViewText(R.id.widget_title,today?"Сегодня":"Задачи");
-        view.setTextColor(R.id.widget_title,ThemeSettings.ios(c)?ThemeSettings.accent(c):(ThemeSettings.dark(c)?0xFF65DACB:0xFF149E92));
-        view.setTextColor(R.id.widget_add,ThemeSettings.ios(c)?ThemeSettings.accent(c):(ThemeSettings.dark(c)?0xFF65DACB:0xFF149E92));
-        view.setTextColor(R.id.widget_menu,ThemeSettings.ios(c)?ThemeSettings.accent(c):(ThemeSettings.dark(c)?0xFF65DACB:0xFF149E92));
+        view.setTextColor(R.id.widget_title,ThemeSettings.accent(c));
+        view.setTextColor(R.id.widget_add,ThemeSettings.accent(c));
+        view.setTextColor(R.id.widget_menu,ThemeSettings.accent(c));
+        view.setInt(R.id.widget_mic,"setColorFilter",ThemeSettings.accent(c));
         view.setTextViewText(R.id.widget_count,tasks.isEmpty()?"Нет активных задач":tasks.size()+" задач");
         view.setOnClickPendingIntent(R.id.widget_add,open(c,-1,true));
+        view.setOnClickPendingIntent(R.id.widget_mic,voice(c));
         view.setOnClickPendingIntent(R.id.widget_title,open(c,-1,false));
         view.setOnClickPendingIntent(R.id.widget_footer,open(c,-1,false));
         view.setOnClickPendingIntent(R.id.widget_menu,open(c,-1,false));
         view.removeAllViews(R.id.widget_rows);
         Bundle options=manager.getAppWidgetOptions(id);
         int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,140);
+        int width=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,140);
+        view.setViewVisibility(R.id.widget_mic,width>=140?android.view.View.VISIBLE:android.view.View.GONE);
         float scale=Math.max(1,c.getResources().getConfiguration().fontScale);
         boolean showDetails=height>=200&&scale<=1.3f;
         int rowHeight=Math.round((showDetails?44:32)*scale);
@@ -82,6 +91,7 @@ public class TaskWidgetProvider extends AppWidgetProvider {
             row.setContentDescription(R.id.widget_check,"Завершить: "+task.title);
             view.addView(R.id.widget_rows,row);
         }
+        view.setTextViewText(R.id.widget_empty,today?"На сегодня всё свободно":"Пока нет задач");
         view.setViewVisibility(R.id.widget_empty,tasks.isEmpty()&&height>80?android.view.View.VISIBLE:android.view.View.GONE);
         manager.updateAppWidget(id,view);
     }

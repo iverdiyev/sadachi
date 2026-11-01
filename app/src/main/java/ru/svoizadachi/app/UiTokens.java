@@ -6,6 +6,7 @@ import android.widget.TextView;
 
 /** Logical dp/sp sizes shared by the compact native phone surfaces. */
 final class UiTokens {
+    static final int MOTION_FAST=120, MOTION_NORMAL=200, MOTION_SMOOTH=280, MOTION_LARGE=340;
     static final int PAGE=20, PAGE_NARROW=16, SECTION=24, GAP=8;
     static final int HEADING=28, SECTION_TEXT=17, TASK=15, BODY=14, SETTING=16, FILTER=13, CAPTION=12;
     static final int ICON_TOUCH=44, FILTER_HEIGHT=36, TASK_MIN=64, SETTING_HEIGHT=54, PRIMARY_HEIGHT=48;

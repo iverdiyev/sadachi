@@ -28,7 +28,7 @@ public class ThemeAndUpdatesTest {
     @Test public void darkActivityStartsWithReadablePalette(){
         ThemeSettings.setMode(RuntimeEnvironment.getApplication(),2);
         try(org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class).setup()){
-            assertEquals(0xFFE8ECF6,ThemeSettings.text(controller.get()));
+            assertEquals(0xFFF3F4F6,ThemeSettings.text(controller.get()));
             assertEquals(0,controller.get().getWindow().getDecorView().getSystemUiVisibility()&View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
     }

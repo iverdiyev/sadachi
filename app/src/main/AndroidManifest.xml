@@ -31,11 +31,11 @@
         </activity-alias>
         <provider android:name=".MigrationProvider" android:authorities="${migrationAuthority}" android:exported="true" android:readPermission="ru.svoizadachi.app.permission.MIGRATE_DATA" android:writePermission="ru.svoizadachi.app.permission.MIGRATE_DATA"/>
         <receiver android:name=".ReminderReceiver" android:exported="false"/>
-        <receiver android:name=".TaskWidgetProvider" android:label="${appLabel} — список" android:exported="false">
+        <receiver android:name=".TaskWidgetProvider" android:label="Sadachi — Задачи" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_tasks_info"/>
         </receiver>
-        <receiver android:name=".TodayWidgetProvider" android:label="${appLabel} — сегодня" android:exported="false">
+        <receiver android:name=".TodayWidgetProvider" android:label="Sadachi — Сегодня" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_tasks_info"/>
         </receiver>

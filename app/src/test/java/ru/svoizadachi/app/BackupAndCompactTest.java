@@ -41,6 +41,15 @@ public class BackupAndCompactTest {
         Application context=RuntimeEnvironment.getApplication();ThemeSettings.setMode(context,1);LauncherIcon.setDark(context,true);
         assertTrue(LauncherIcon.dark(context));assertFalse(ThemeSettings.dark(context));LauncherIcon.setDark(context,false);assertFalse(LauncherIcon.dark(context));
     }
+    @Test public void widgetShowsMicrophoneOnlyWhenWidthAllowsIt(){
+        Application context=RuntimeEnvironment.getApplication();AppWidgetManager manager=AppWidgetManager.getInstance(context);
+        int id=shadowOf(manager).createWidget(TaskWidgetProvider.class,R.layout.widget_tasks);
+        Bundle size=new Bundle();size.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,100);
+        manager.updateAppWidgetOptions(id,size);
+        assertEquals(View.GONE,shadowOf(manager).getViewFor(id).findViewById(R.id.widget_mic).getVisibility());
+        size.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,200);manager.updateAppWidgetOptions(id,size);
+        assertEquals(View.VISIBLE,shadowOf(manager).getViewFor(id).findViewById(R.id.widget_mic).getVisibility());
+    }
     @Test public void iosStyleIsOptionalAndDoesNotTouchNotesOrTheme(){
         Application context=RuntimeEnvironment.getApplication();TaskStore store=new TaskStore(context);
         Task task=new Task(store.allocateId(),"Остаться на месте",null,false,0,false);store.upsert(task);
@@ -52,7 +61,7 @@ public class BackupAndCompactTest {
         assertEquals("Остаться на месте",store.find(task.id).title);
         ThemeSettings.setMode(context,2);assertEquals(0xFF000000,ThemeSettings.background(context));
         assertEquals(0xFF0A84FF,ThemeSettings.accent(context));
-        ThemeSettings.setIos(context,false);assertEquals(0xFF111622,ThemeSettings.background(context));
+        ThemeSettings.setIos(context,false);assertEquals(0xFF101114,ThemeSettings.background(context));
         assertEquals("Остаться на месте",store.find(task.id).title);
     }
     @Test public void iosWidgetUsesTheSameAccentAsTheApp(){

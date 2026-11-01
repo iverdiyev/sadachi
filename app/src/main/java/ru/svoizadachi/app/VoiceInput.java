@@ -81,7 +81,7 @@ public final class VoiceInput {
     private void render(Session s,State state){
         s.state=state;
         String message=state==State.PREPARING?"Подготовка встроенной русской модели…":
-                state==State.LISTENING?"Слушаю… До 60 секунд. Останови запись, когда закончишь.":
+                 state==State.LISTENING?"Слушаю… Назови одну или несколько задач. Нажми «Остановить», когда закончишь.":
                 state==State.TRANSCRIBING?"Распознаю речь…":
                 state==State.EMPTY?"Не удалось разобрать слова. Попробуй ещё раз или введи задачу текстом.":
                 "Не удалось запустить офлайн-распознавание. Проверь микрофон и свободное место.";
@@ -112,18 +112,24 @@ public final class VoiceInput {
                 recorder.startRecording();if(recorder.getRecordingState()!=AudioRecord.RECORDSTATE_RECORDING)throw new IOException("Microphone busy");
                 VoiceSilenceDetector silence=new VoiceSilenceDetector(VoiceSettings.silenceMillis(activity));
                 ui(s,()->render(s,State.LISTENING));
-                byte[] buffer=new byte[3200];long deadline=SystemClock.elapsedRealtime()+60000,last=0,lastWave=0;
+                byte[] buffer=new byte[3200];long started=SystemClock.elapsedRealtime();
+                long deadline=started+VoiceSettings.maxDurationMillis(activity),last=0,lastWave=0,lastClock=0;
                 while(!s.stop.get()&&!s.cancelled.get()&&SystemClock.elapsedRealtime()<deadline){
                     int count=recorder.read(buffer,0,buffer.length);if(count<0)throw new IOException("Audio read failed");if(count==0){Thread.sleep(20);continue;}
                     float rms=VoiceWaveform.pcmRms(buffer,count);long now=SystemClock.elapsedRealtime();
                     if(now-lastWave>=48){ui(s,()->{if(s.state==State.LISTENING&&!s.stop.get())s.wave.level(rms);});lastWave=now;}
-                    if(silence.shouldStop(rms,now)){ui(s,()->render(s,State.TRANSCRIBING));break;}
                     if(recognizer.acceptWaveForm(buffer,count))append(words,new JSONObject(recognizer.getResult()).optString("text"));
                     if(SystemClock.elapsedRealtime()-last>250){
                         String preview=(words+" "+new JSONObject(recognizer.getPartialResult()).optString("partial")).trim();
-                        ui(s,()->s.preview.setText(preview));last=SystemClock.elapsedRealtime();
+                        ui(s,()->{if(s.state==State.LISTENING)s.preview.setText(preview.isEmpty()?EMPTY_PREVIEW:preview);});last=now;
                     }
+                    if(now-lastClock>=1000){long seconds=(now-started)/1000;
+                        ui(s,()->{if(s.state==State.LISTENING)s.status.setText(String.format(java.util.Locale.getDefault(),"Слушаю… %d:%02d · Останови, когда закончишь",seconds/60,seconds%60));});lastClock=now;
+                    }
+                    if(silence.shouldStop(rms,now)){ui(s,()->render(s,State.TRANSCRIBING));break;}
                 }
+                if(!s.stop.get()&&!s.cancelled.get()&&SystemClock.elapsedRealtime()>=deadline)
+                    ui(s,()->{render(s,State.TRANSCRIBING);s.status.setText("Достигнута выбранная длительность. Сохраняю распознанное…");});
                 if(!s.cancelled.get()){
                     append(words,new JSONObject(recognizer.getFinalResult()).optString("text"));s.accepted.set(true);
                 }
